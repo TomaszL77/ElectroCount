@@ -22,3 +22,6 @@ docs/*.json
 docs/*.xml
 
 !tests/fixtures/*.pdf
+
+.runtime-path
+debug/

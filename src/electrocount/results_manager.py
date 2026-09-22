@@ -53,7 +53,7 @@ class ResultsManager:
                     old.group, old.decision, old.reason = "", "review", "not_rediscovered"
                     old.requested_group = group_id
                 new.append(old)
-        project.analysis_reports[f"{group_id}:{page}"] = {"pipeline":result.get("pipeline",{}),"stages":result.get("stages",{}),"rejected_candidates":result.get("rejected_candidates",[]),"coverage_warnings":result.get("coverage_warnings",[])}
+        project.analysis_reports[f"{group_id}:{page}"] = {"counts":result.get("counts",{}),"legend_matches":result.get("legend_matches",[]),"result_sha256":result.get("result_sha256"),"pipeline":result.get("pipeline",{}),"stages":result.get("stages",{}),"rejected_candidates":result.get("rejected_candidates",[]),"coverage_warnings":result.get("coverage_warnings",[])}
         project.detections = untouched + new
         project.discoveries = discoveries
         project.text_items[str(page)] = [{**item, "page": page} for item in result["text_items"]]

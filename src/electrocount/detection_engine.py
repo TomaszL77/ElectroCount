@@ -19,7 +19,7 @@ class DetectionEngine:
     def find(self,path,page,template,label="",threshold=.82,progress=lambda p:None,template_path=None,status=lambda text:None):
         status("Odczyt tekstu i przygotowanie wzorca")
         source=template_path or path
-        if not template.get("text_aware") or (template.get("definition_version",0)<3 and
+        if not template.get("text_aware") or (template.get("definition_version",0)<4 and
                 template.get("selection_rect") and hasattr(self.pdf,"open_vector_page")):
             template=prepare_template(self.pdf,source,template["page"],template.get("selection_rect",template["rect"]))
         expected=normalize_text(label or template.get("label",""))
@@ -35,11 +35,17 @@ class DetectionEngine:
         if not self.custom_matcher and signature and signature.get("native_local") and hasattr(self.pdf,"open_vector_page"):
             progress(10)
             status("Indeks geometrii i sprawdzanie otoczenia oznaczeń")
-            with self.pdf.open_vector_page(path,page) as native:
-                found,native_stats=native.find(signature,items,expected,lambda p:progress(10+round(p*.20)))
-                proposals.extend(found)
-            vectors={"has_images":native_stats["has_images"],"unsupported":int(native_stats["truncated"] or native_stats["limited_queries"] or native_stats["clipped_anchor_paths"]),
-                     "truncated":native_stats["truncated"]}
+            try:
+                with self.pdf.open_vector_page(path,page) as native:
+                    found,native_stats=native.find(signature,items,expected,lambda p:progress(10+round(p*.20)))
+                    proposals.extend(found)
+                vectors={"has_images":native_stats["has_images"],"unsupported":int(native_stats["truncated"] or native_stats["limited_queries"] or native_stats["clipped_anchor_paths"]),
+                         "truncated":native_stats["truncated"]}
+            except (RuntimeError,AttributeError) as exc:
+                warnings.append("Geometria PDF niedostępna; przełączono na matcher obrazu CPU: "+str(exc))
+                native_stats={}
+                vectors={'has_images':True,'unsupported':1,'truncated':False,'paths':[]}
+                signature=None
         elif not self.custom_matcher and hasattr(self.pdf,"extract_vectors"):
             if not signature:
                 signature=signature_in_rect(self.pdf.extract_vectors(source,template["page"]),template["rect"])
@@ -130,6 +136,21 @@ class DetectionEngine:
             else:
                 hit["reason"]="different_label"
                 result["discovered_other_label"].append(hit)
+        from .document_regions import region_for
+        regions=native_stats.get('regions',[])
+        result['legend_matches']=[]
+        countable=[]
+        for hit in result['matches']:
+            region=region_for(hit['rect'],regions)
+            if region:
+                result['legend_matches'].append({**hit,'reason':'legend_reference','region':region['rect']})
+            else:countable.append(hit)
+        result['matches']=countable
+        result['counts']={'raw_matches':len(countable)+len(result['legend_matches']),
+            'legend_matches':len(result['legend_matches']),'countable_devices':len(countable)}
+        result['regions']=regions
+        if len(countable)<=1:
+            warnings.append("Znaleziono co najwyżej jeden element. Sprawdź wycinek wzorca, oznaczenie i zakres stron; wynik nie potwierdza kompletności zliczania.")
         status("Kończenie analizy strony")
         progress(100)
         return result

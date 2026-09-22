@@ -110,8 +110,12 @@ def prepare_template(engine, path, page, selection):
         raise ValueError("Zaznacz pojedynczy symbol z oznaczeniem (maksymalnie 300 punktów na bok).")
     signature = None
     if hasattr(engine,"open_vector_page"):
-        with engine.open_vector_page(path,page) as native:
-            signature=native.template_signature(selection,items)
+        try:
+            with engine.open_vector_page(path,page) as native:
+                signature=native.template_signature(selection,items)
+        except (RuntimeError,AttributeError) as exc:
+            import logging
+            logging.warning("Native template unavailable; CPU raster fallback: %s",exc)
     elif hasattr(engine,"extract_vectors"):
         from .vector_engine import signature_in_rect
         signature=signature_in_rect(engine.extract_vectors(path,page),selection)
@@ -149,7 +153,7 @@ def prepare_template(engine, path, page, selection):
             "label_item": item.to_dict() if item else None,
             "spatial_association_score": association["score"],
             "reason": association["reason"], "text_aware": True,
-            "definition_version": 3, "geometry_source": "native_local" if signature else "raster",
+            "definition_version": 4, "geometry_source": "native_local" if signature else "raster",
             "text_bbox":item.bbox if item else None,
             "self_check":bool(signature),
             "possible_label": (association.get("alternatives") or [{}])[0].get("normalized_text", "")}

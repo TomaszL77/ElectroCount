@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QColor, QIcon, QPixmap, QTransform
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QListWidget, QListWidgetItem, QTreeWidget, QTreeWidgetItem, QSplitter, QToolBar,
-    QFileDialog, QInputDialog, QMessageBox, QColorDialog, QProgressBar, QDoubleSpinBox,
+    QApplication, QFileDialog, QInputDialog, QMessageBox, QColorDialog, QProgressBar, QDoubleSpinBox,
     QCheckBox, QPushButton, QTabWidget, QMenu, QListView)
 from .commands import Command, CommandRegistry
 from .domain import Project, Group, Detection, ConflictEngine, counts, near
@@ -23,6 +23,8 @@ from .detection_debug import DetectionDebug
 from .profiling_service import PerformanceController
 from .performance_dialog import PerformanceDialog
 from .operation_progress import OperationProgress
+from .diagnostics import data_dir, new_debug_run, runtime_info, write_json
+from . import __version__
 
 STYLE = """
 QMenuBar { background: #192435; color: #dce4ef; }
@@ -85,20 +87,44 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.register_commands()
         self.build_ui()
         self.init_import_ui()
+        self.view.viewport_changed.connect(lambda:self.view.draw_detections(self.project,self.conflict_ids,self.selected,self.review_only.isChecked()))
         self.refresh()
         self.performance = PerformanceController(self.settings_store,self)
         self.performance.changed.connect(self.update_performance)
         self.performance.notice.connect(lambda message:self.statusBar().showMessage(message,20000))
         self.jobs.performance_fallback.connect(self.performance.apply_fallback)
         self.update_performance()
+        self.startup_runtime=runtime_info(QApplication.instance())
+        write_json(data_dir()/"logs"/"runtime_info.json",self.startup_runtime)
         if not os.environ.get("ELECTROCOUNT_SKIP_PROFILE"):
             QTimer.singleShot(500,self.performance.start)
 
     def update_performance(self):
+        if hasattr(self,'startup_runtime') and self.performance.report:
+            self.startup_runtime['hardware_profile']=self.performance.report
+            write_json(data_dir()/"logs"/"runtime_info.json",self.startup_runtime)
         plan = self.performance.plan
         self.jobs.performance_plan = plan.to_dict()
         self.performance_button.setText(f"{plan.mode} → {plan.effective.title()}" if plan.mode=="AUTO" else plan.effective.title())
         self.performance_button.setToolTip(f"{plan.reason}\n{self.performance.state}\nKliknij, aby zmienić tryb lub obejrzeć pomiar.")
+
+    def toggle_artifacts(self):
+        enabled=not self.settings_store.get("debug/artifacts",False)
+        self.settings_store.set("debug/artifacts",enabled)
+        self.statusBar().showMessage("Zapis wycinków diagnostycznych "+("włączony" if enabled else "wyłączony"),10000)
+
+    def open_debug_folder(self):
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        folder=data_dir();folder.mkdir(parents=True,exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    def run_self_test(self):
+        directory=new_debug_run()
+        def ready(report):
+            self.last_self_test=report
+            self.statusBar().showMessage(f"Test diagnostyczny: {report['status']} · {report['actual']} / {report['expected']} · {directory}",60000)
+        self.jobs.submit({"kind":"self_test","debug_dir":str(directory)},ready,analysis=True)
 
     def show_performance(self):
         PerformanceDialog(self.performance,self).exec()
@@ -131,6 +157,11 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("assign", "Przypisz do grupy", "layers", self.reassign, selected),
             Command("escape", "Anuluj narzędzie", "pan", lambda: self.set_mode("pan"), shortcut="Esc"),
             Command("debug", "Detection Debug", "settings", self.toggle_debug, checked=lambda: hasattr(self,"debug_panel") and self.debug_panel.isVisible()),
+            Command("artifacts", "Tryb diagnostyczny: zapisuj wycinki", "settings", self.toggle_artifacts,
+                checked=lambda:self.settings_store.get("debug/artifacts",False)),
+            Command("diagnostic_test", "Uruchom test diagnostyczny", "check", self.run_self_test,
+                lambda:not self.busy and not self.loading),
+            Command("debug_folder", "Otwórz logi i wycinki", "open", self.open_debug_folder),
             Command("performance", "Wydajność i sprzęt", "settings", self.show_performance),
             Command("settings", "Próg konfliktu", "settings", self.settings, lambda: not self.busy),
         ]
@@ -149,13 +180,14 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.current_page_only.toggled.connect(lambda value: self.settings_store.set("search/current_page_only",value))
         sections = [("Projekt", ["new", "open", "save"]), ("Widok", ["pan", "fit"]),
                     ("Zliczanie", ["group", "template", "find", "manual"]),
-                    ("Edycja", ["undo", "redo"]), ("Ustawienia", ["settings", "debug", "performance"])]
+                    ("Edycja", ["undo", "redo"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "performance"])]
         for title, keys in sections:
             menu = self.menuBar().addMenu(title)
             if toolbar.actions():
                 toolbar.addSeparator()
             for key in keys:
-                toolbar.addAction(self.registry.actions[key])
+                if key not in ("debug","artifacts","diagnostic_test","debug_folder","performance"):
+                    toolbar.addAction(self.registry.actions[key])
                 if key=="find":
                     toolbar.addWidget(self.current_page_only)
                 menu.addAction(self.registry.actions[key])
@@ -631,7 +663,9 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 self.statusBar().showMessage(info,15000)
                 self.set_mode("pan")
                 self.refresh()
-            self.jobs.submit({"kind": "template", "path": path, "page": source_page, "rect": rect}, prepared)
+            self.jobs.submit({"kind": "template", "path": path, "page": source_page, "rect": rect,
+                "selection_context":self.view.last_selection_context,
+                "debug_dir":str(new_debug_run()) if self.settings_store.get("debug/artifacts",False) else None}, prepared)
         elif self.view.mode == "manual" and group:
             self.checkpoint()
             detection = Detection(group.id, self.project.page, rect, decision="accepted", source="manual")
@@ -677,7 +711,10 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             self.statusBar().showMessage(f"Przeanalizowano {len(pages)} stron · zgodnych kandydatów: {total}"+suffix,20000)
         self.jobs.submit({"kind": "batch_match", "pages": pages,
             "template": template, "template_path": template_path, "label": group.label,
-            "threshold": self.project.threshold}, ready, analysis=True)
+            "threshold": self.project.threshold,
+            "config":{"search_scope":"current_page" if self.current_page_only.isChecked() else "current_document",
+                "pages":indices,"text_filter":"exact_native","ai_mode":"deterministic_cpu","gui_runtime":self.startup_runtime},
+            "debug_dir":str(new_debug_run()) if self.settings_store.get("debug/artifacts",False) else None}, ready, analysis=True)
 
 
     def selected_detection(self):
@@ -859,7 +896,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             self.hint.setText("Rolka: zoom · przeciągnij: przesuwanie" if self.project.source else "Otwórz PDF i utwórz pierwszą grupę.")
         self.tabs.setTabText(1, f"Konflikty ({len(self.conflicts)})")
         self.registry.actions["conflicts"].setText(f"Konflikty ({len(self.conflicts)})" if self.conflicts else "Konflikty")
-        self.setWindowTitle(f"ElectroCount 0.5 · {self.project.name}" + (" *" if self.dirty else ""))
+        self.setWindowTitle(f"ElectroCount {__version__} · {self.project.name}" + (" *" if self.dirty else ""))
         for index, page in enumerate(self.project.pages):
             if index < self.pages.count():
                 self.pages.item(index).setText(f"{index+1:02}  {page['name']}")
@@ -894,7 +931,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             pending = sum(not d.group and d.requested_group == group.id and d.decision != "rejected" for d in self.project.detections)
             others = Counter(d["label"] for d in self.project.discoveries if d["requested_group"] == group.id)
             other_text = ", ".join(f"{code}: {number}" for code, number in others.items()) or "brak"
-            self.summary.setText(f"{group.name} · oznaczenie: {group.label or ('możliwe '+group.possible_label if group.possible_label else 'brak — wzorzec graficzny')}\n{accepted} zatwierdzonych · {review} do sprawdzenia · {conflict} w konflikcie\nBez przypisania: {pending}\nInne oznaczenia: {other_text}")
+            legend=sum(r.get("counts",{}).get("legend_matches",0) for key,r in self.project.analysis_reports.items() if key.startswith(group.id+":"))
+            self.summary.setText(f"Znaleziono {accepted+review+conflict} · {legend} w legendzie (nie doliczono)\n{group.name} · oznaczenie: {group.label or ('możliwe '+group.possible_label if group.possible_label else 'brak — wzorzec graficzny')}\n{accepted} zatwierdzonych · {review} do sprawdzenia · {conflict} w konflikcie\nBez przypisania: {pending}\nInne oznaczenia: {other_text}")
         else:
             self.summary.setText("Zaznacz wzorzec z oznaczeniem lub utwórz grupę.")
         self.view.draw_detections(self.project, self.conflict_ids, self.selected, self.review_only.isChecked())

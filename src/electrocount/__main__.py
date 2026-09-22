@@ -11,8 +11,9 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("ElectroCount")
     app.setOrganizationName("ElectroCount")
-    logs = Path(__file__).resolve().parents[2] / "logs"
-    logs.mkdir(exist_ok=True)
+    from .diagnostics import data_dir
+    logs = data_dir() / "logs"
+    logs.mkdir(parents=True,exist_ok=True)
     logging.basicConfig(level=logging.INFO, handlers=[
         RotatingFileHandler(logs/"electrocount.log", maxBytes=2_000_000, backupCount=3, encoding="utf-8")])
     def exception_hook(kind, value, trace):

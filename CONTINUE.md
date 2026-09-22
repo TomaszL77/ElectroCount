@@ -1,3 +1,17 @@
+# Aktualizacja 0.6 — 21.09.2026
+
+Krytyczny problem został odtworzony na kodzie 0.5: zaznaczenie 80×100 pt zawierało 43 ścieżki i dawało 1 wynik. Wybór 40×55 pt dawał 12, a wąski 16×46 pt dawał 72. Poprawka w native_geometry wyodrębnia kompletny wypełniony korpus przy wszystkich tych marginesach; przecięty korpus jest odrzucany z komunikatem. Szczegóły, ograniczenia i dowody: docs/diagnostyka-06.md.
+
+Nowe moduły: detection_service, diagnostics, document_regions, self_test_pdf, debug_cli. run_detection jest wspólnym wejściem GUI/workera/CLI/testów. GUI zapisuje source_sha256 przy starcie; worker odrzuca żądanie po zmianie kodu w uruchomionej sesji. Runtime, ustawienia, DPI i bbox są w logach lokalnych. Artefakty obrazowe opt-in z menu. Wbudowany self-test 12/12 działa także z GUI.
+
+Potwierdzono 73 raw L3 / 1 legenda / 72 countable; automatyczne regiony legendy wymagają nagłówka i ramki tabeli. Oś konstrukcyjna L3 nie jest oprawą. Inne typy i niejednoznaczne wyniki nadal wymagają odrębnej oceny. Nie poszerzać skali kandydatów poza legendą tylko po to, żeby zwiększać ilości.
+
+Czysta instalacja PySide6 nie udała się w długiej ścieżce repo/.venv (Windows MAX_PATH). Instalator używa teraz %LOCALAPPDATA%/ElectroCount/py312-06. requirements-win.lock ma konkretne hashe kół; check_runtime.py sprawdza instalację, Instaluj.cmd wykonuje self-test. Na komputerze diagnostycznym środowisko jest w krótkim C:/Users/tomci/Documents/Codex/ec06-venv, zapisane w ignorowanym .runtime-path. Nie przenosić .runtime-path ani venv na drugi komputer.
+
+Testy Qt 100/125/150% na tym Windows, zoom 3/1/0.2, prawdziwe zdarzenia myszy, 72 identyczne pozycje, GUI == service i zgodny zapis/odczyt. Nowy venv z 16 pakietami z blokady; to nie test na trzech fizycznych komputerach. Nadal brak EXE/modelu neuronowego/OCR.
+
+Poniżej historia 0.5 (nie instrukcja uruchomienia bieżącej wersji).
+
 # Stan prac — 20.09.2026
 
 Cel: desktopowa aplikacja Windows ElectroCount do zliczania dowolnego wzorca wybranego na dokumentacji instalacji. PySide6, Python 3.12, PDFium, OpenCV. Wersja 0.5.0. GUI i worker są w src/electrocount. Źródłem prawdy jest kod i testy, nie historyczne raporty.

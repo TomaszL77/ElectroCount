@@ -1,14 +1,19 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-if exist "%~dp0.venv\Scripts\pythonw.exe" (
-    start "" "%~dp0.venv\Scripts\pythonw.exe" "%~dp0launch.py" %*
-    exit /b
+set "EC_VENV=%LOCALAPPDATA%\ElectroCount\py312-06"
+if exist "%~dp0.runtime-path" set /p "EC_VENV="<"%~dp0.runtime-path"
+if not exist "%EC_VENV%\Scripts\pythonw.exe" goto missing
+"%EC_VENV%\Scripts\python.exe" "%~dp0check_runtime.py" > "%TEMP%\ElectroCount-runtime-check.txt" 2>&1
+if errorlevel 1 (
+    echo Wersje bibliotek nie pasuja do tej wersji ElectroCount. Uruchom Instaluj.cmd.
+    type "%TEMP%\ElectroCount-runtime-check.txt"
+    pause
+    exit /b 1
 )
-set "PY=%~dp0..\..\work\.venv\Scripts\pythonw.exe"
-if exist "%PY%" (
-    start "" "%PY%" "%~dp0launch.py" %*
-    exit /b
-)
-echo Najpierw uruchom Instaluj.cmd.
+start "ElectroCount" "%EC_VENV%\Scripts\pythonw.exe" "%~dp0launch.py" %*
+exit /b 0
+:missing
+echo Najpierw uruchom Instaluj.cmd. Aplikacja korzysta tylko z runtime w krotkiej sciezce.
 pause
+exit /b 1

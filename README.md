@@ -1,10 +1,14 @@
-# ElectroCount 0.5 — detekcja na rzeczywistych PDF-ach
+# ElectroCount 0.6 — powtarzalna instalacja i diagnostyka
 
 Lokalna aplikacja Windows do zliczania symboli instalacji. Nowy silnik wyodrębnia lokalną geometrię wzorca, sprawdza obroty i wiąże wyniki z dokładnym tekstem PDF. Zachowuje HardwareProfiler, AUTO, grupy i format projektu. Nie instaluje modeli ani nie uruchamia treningu.
 
 ## Uruchomienie
 
-Uruchom **Uruchom.cmd**. Środowisko na tym komputerze jest przygotowane. Na nowym komputerze: Python 3.12 64-bit → Instaluj.cmd → Uruchom.cmd.
+Na każdym komputerze: Python 3.12 64-bit → **Instaluj.cmd** → **Uruchom.cmd**. Instalator sprawdza wersje i SHA-256 bibliotek oraz wynik wbudowanego testu 12/12. Runtime znajduje się w krótkiej ścieżce `%LOCALAPPDATA%/ElectroCount/py312-06`, aby uniknąć błędu długich ścieżek PySide6 na Windows.
+
+**Zacznij od [START-TUTAJ.md](START-TUTAJ.md)**. Stan prac: [CONTINUE.md](CONTINUE.md). Opis przyczyn błędu 1/72, zbierania wycinków i testów: [docs/diagnostyka-06.md](docs/diagnostyka-06.md).
+
+Wersja 0.6 naprawia wybór pojedynczej oprawy z większego zaznaczenia, odrzuca przecięte korpusy i zapisuje współrzędne gestu. GUI, CLI i self-test używają tego samego `run_detection`. W PDF hali wynik to 73 symbole L3 razem z legendą, 1 przykład wyłączony, 72 sztuki. Legenda jest rozpoznawana konserwatywnie z nagłówka i ramki tabeli. Wyniki mają wyraźny obrys niezależny od zoomu. Ustawienia → Tryb diagnostyczny zapisuje wycinki i log analizy. Diagnostyka.cmd uruchamia kontrolę instalacji. Nie ma jeszcze packaged EXE.
 
 Przykład kontrolny: `examples/projekt-ai-demo/project.sqlite`. Szybkie otwarcie przykładu: **Test_L3.cmd**. Rzeczywista hala z grupą L3 i widokiem kontrolowanej pary: **examples/projekt-l3-05/project.sqlite**. Wszystkie automatyczne wyniki w tym projekcie wymagają weryfikacji.
 Test kontrolny na `rzut-testowy-demo.pdf`, strona 1: **QP14 = 4, A1 = 8**. Wyniki automatyczne oczekują weryfikacji użytkownika.
@@ -56,13 +60,13 @@ DWG/DXF są kierowane przez FileImportManager do interfejsu CADEngine. Parser CA
 - `ai/context_engine.py`: neutralny, nieaktywny ContextEngine.
 - `ai/training_dataset.py`: kontrakty wersjonowanych przykładów i podziałów; zbieranie danych jest wyłączone.
 
-DINOv2, OCR, kontekstowy VLM, legenda, budowanie grafu, eksport datasetu i trening **nie są aktywne**. Istniejący adapter LightGlue wymaga w przyszłości dostarczenia lokalnie załadowanego modelu; nie instaluje wag. Dokumenty/cropy nie są wysyłane do internetu.
+DINOv2, OCR, kontekstowy VLM, semantyczne rozumienie dowolnej legendy, budowanie grafu, eksport datasetu i trening **nie są aktywne**. Istniejący adapter LightGlue wymaga w przyszłości dostarczenia lokalnie załadowanego modelu; nie instaluje wag. Dokumenty/cropy nie są wysyłane do internetu.
 
 ## Testy i dalszy etap
 
 Szczegóły: **docs/testy.md**, **docs/architektura-ai.md**, **docs/pakiet-testowy.json**.
 
-Uruchom testy w środowisku aplikacji: `python -m pytest -q`. Dodatkowy test czterech rzeczywistych PDF wymaga ustawienia `ELECTROCOUNT_TEST_PACK` na lokalny folder użytkownika; bez niego jest jawnie pomijany. Test pary z hali używa `ELECTROCOUNT_TEST_HALA` wskazującego dostarczony plik oświetlenia. Pliki pakietu nie są włączone do datasetu treningowego.
+Uruchom **Testy.cmd** lub `python -m pytest -q` w środowisku aplikacji. Dodatkowy test czterech rzeczywistych PDF wymaga ustawienia `ELECTROCOUNT_TEST_PACK` na lokalny folder użytkownika; bez niego jest jawnie pomijany. Test pary z hali używa `ELECTROCOUNT_TEST_HALA` wskazującego dostarczony plik oświetlenia. Pliki pakietu nie są włączone do datasetu treningowego.
 
 Następny etap: uporządkować typy dokumentów i kontekst strony, zbudować graf oraz model legendy, przygotować ręcznie zweryfikowany benchmark. E-01/E-07 wymagają także osobnego OCR fallback, bo widoczne napisy są grafiką, nie tekstem PDF. Dopiero potem mały, lokalny proof of concept enkodera i pomiar jakości na wydzielonym benchmarku.
 

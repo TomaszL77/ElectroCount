@@ -1,3 +1,9 @@
+# Weryfikacja 0.6
+
+Pełny zestaw 70 PASS oraz dodatkowe testy diagnostyki. Testy GUI 100/125/150%, czysty runtime i sesja konta Windows użytkownika: 72 oprawy L3 + 1 legenda, jednakowe położenia. Szczegóły: [diagnostyka-06.md](diagnostyka-06.md).
+
+Poniżej historyczne raporty wersji 0.5 i wcześniejszych.
+
 # Walidacja ElectroCount 0.5 — 19.09.2026
 
 **62 testy przeszły, 0 błędów i 0 pominiętych; 169,85 s.** Włączono pakiet rzeczywistych PDF i regresję dwóch sąsiednich L3. Po końcowym zwiększeniu czytelności cienkich znaczników ponowiono oba testy GUI: 2/2 przeszły w 9,12 s. Ponownie uruchomiono też okno hali i sprawdzono zapis/odczyt bez błędów. Aktualny wynik maszynowy: test-results.xml. Szczegóły nowego detektora, zakres oraz ograniczenia: [detekcja-05.md](detekcja-05.md).

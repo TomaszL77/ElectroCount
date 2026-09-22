@@ -16,6 +16,7 @@ class DrawingView(QGraphicsView):
         self.setTransformationAnchor(self.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(self.ViewportAnchor.AnchorViewCenter)
         self.setDragMode(self.DragMode.ScrollHandDrag)
+        self.last_selection_context = {}
         self.mode = "pan"
         self.start_point = None
         self.rubber = None
@@ -91,6 +92,7 @@ class DrawingView(QGraphicsView):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             if self.mode != "pan":
+                self.start_screen = event.position()
                 self.start_point = self.mapToScene(event.position().toPoint())
                 self.rubber = self.scene().addRect(QRectF(self.start_point, self.start_point),
                     QPen(QColor("#29d8c1"), 0), QBrush(QColor(41, 216, 193, 30)))
@@ -111,7 +113,19 @@ class DrawingView(QGraphicsView):
 
     def mouseReleaseEvent(self, event):
         if self.start_point is not None and self.rubber:
-            rect = self.rubber.rect()
+            # Recompute at release: Windows can coalesce/drop the last move event.
+            rect = QRectF(self.start_point,self.mapToScene(event.position().toPoint())).normalized().intersected(self.page_rect)
+            screen=QRectF(self.start_screen,event.position()).normalized()
+            dpr=self.viewport().devicePixelRatioF();zoom=self.transform().m11()
+            self.last_selection_context={
+                'screen_selection_bbox':[screen.x(),screen.y(),screen.width(),screen.height()],
+                'screen_coordinate_space':'viewport logical pixels (Qt events)',
+                'physical_selection_bbox':[v*dpr for v in [screen.x(),screen.y(),screen.width(),screen.height()]],
+                'pdf_selection_bbox':[rect.x(),rect.y(),rect.width(),rect.height()],
+                'rendered_image_bbox':[v*2 for v in [rect.x(),rect.y(),rect.width(),rect.height()]],
+                'render_scale':2.0,'dpi':144,'zoom':zoom,'devicePixelRatio':dpr,
+                'logical_dpi':self.logicalDpiX(),'transform':[self.viewportTransform().m11(),self.viewportTransform().m22(),self.viewportTransform().dx(),self.viewportTransform().dy()]}
+
             self.scene().removeItem(self.rubber)
             self.rubber = None
             self.start_point = None
@@ -131,19 +145,24 @@ class DrawingView(QGraphicsView):
                 continue
             if only_review and detection.decision != "review" and detection.id not in conflicts:
                 continue
-            color = QColor("#fa6076") if detection.id in conflicts else QColor(group.color)
+            if detection.decision == "rejected":continue
+            color = QColor("#d526b7" if detection.id in conflicts else
+                "#35a867" if detection.decision=="accepted" else
+                "#e58a22" if not detection.group or detection.reason in ("ambiguous_label","missing_label","shared_label","not_rediscovered") else "#e84242")
             if detection.decision == "rejected":
                 color = QColor("#8b94a2")
-            pen = QPen(color, 2.8 if detection.id == selected else 1.5)
+            pen = QPen(color, 3.2 if detection.id == selected else 2.0)
             pen.setCosmetic(True)
-            if detection.decision == "review":
-                pen.setStyle(Qt.PenStyle.DashLine)
+            color.setAlpha(220)
             fill = QColor(color)
-            fill.setAlpha(24 if detection.decision != "rejected" else 7)
+            fill.setAlpha(50 if detection.id == selected else 38)
             marker = QRectF(*detection.rect)
             # Keep thin native bodies visible/clickable without changing their
             # measured geometry, quantities or conflict checks.
-            dx=max(0,(3-marker.width())/2);dy=max(0,(3-marker.height())/2)
+            minimum=8/max(.01,self.transform().m11())
+            dx=max(0,(minimum-marker.width())/2);dy=max(0,(minimum-marker.height())/2)
+            if detection.id==selected:
+                dx+=2/max(.01,self.transform().m11());dy+=2/max(.01,self.transform().m11())
             marker.adjust(-dx,-dy,dx,dy)
             item = self.scene().addRect(marker, pen, QBrush(fill))
             item.setZValue(8 if detection.id == selected else 5)

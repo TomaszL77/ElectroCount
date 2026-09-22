@@ -2,12 +2,13 @@
 import os
 from pathlib import Path
 from PySide6.QtCore import QSettings
+from .diagnostics import data_dir
 
 
 class Settings:
     def __init__(self):
         path = Path(os.environ.get("ELECTROCOUNT_SETTINGS_PATH",
-                    str(Path(__file__).resolve().parents[2]/".state"/"settings.ini")))
+                    str(data_dir()/"settings.ini")))
         path.parent.mkdir(parents=True, exist_ok=True)
         self.store = QSettings(str(path), QSettings.Format.IniFormat)
 

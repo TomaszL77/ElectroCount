@@ -19,7 +19,7 @@ class JobManager(QObject):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.temp = QTemporaryDir("electrocount-XXXXXX")
+        self.temp = QTemporaryDir()
         self.queue = deque()
         self.performance_plan = {}
         self.render_process = None
@@ -58,7 +58,7 @@ class JobManager(QObject):
         process.outcome = None
         process.cancelled = False
         process.handled = False
-        foreground = request["kind"] in ("import","template","batch_match","match")
+        foreground = request["kind"] in ("import","template","batch_match","match","self_test")
 
         def read():
             process.buffer += bytes(process.readAllStandardOutput())

@@ -57,4 +57,5 @@ def app():
 @pytest.fixture(autouse=True)
 def isolate_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("ELECTROCOUNT_SKIP_PROFILE","1")
+    monkeypatch.setenv("ELECTROCOUNT_DATA_DIR",str(tmp_path/"app-data"))
     monkeypatch.setenv("ELECTROCOUNT_SETTINGS_PATH",str(tmp_path/"settings.ini"))

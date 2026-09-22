@@ -206,6 +206,16 @@ class NativeVectorPage:
         colored_ids=[i for i in ids if self.index[i,6]]
         if colored_ids and max(max(self.bounds[i,2:]) for i in colored_ids)>=.35*max(selection[2:]):
             ids=colored_ids
+        # Reject a crop cutting a filled body instead of learning an incidental
+        # cross/annotation contained in that crop. Coordinates are PDF points.
+        b=self.bounds;x,y,w,h=selection
+        intersecting=np.flatnonzero((b[:,0]<x+w)&(b[:,1]<y+h)&(b[:,0]+b[:,2]>x)&(b[:,1]+b[:,3]>y)
+            &(np.maximum(b[:,2],b[:,3])>=.5*max(w,h))
+            &(np.minimum(b[:,2],b[:,3])>0)
+            &(np.maximum(b[:,2],b[:,3])/np.maximum(.01,np.minimum(b[:,2],b[:,3]))>=5))
+        for candidate in self.decode(intersecting) or []:
+            if candidate.get('fill') and not contains(selection,candidate['bbox'],.7):
+                raise ValueError("Zaznaczenie przecina symbol. Obejmij całą oprawę wraz z oznaczeniem.")
         paths=self.decode(ids)
         if not paths or any(int(i) in self.clipped for i in ids):return None
         # Native text is a distinct object, so its rectangular mask never erases
@@ -222,7 +232,7 @@ class NativeVectorPage:
             core=filled[0]
             # Thin filled bodies (luminaires, bars) are independent native
             # objects; overlapping annotations and wire continuations aren't.
-            if max(core['bbox'][2:])>=.5*max(selection[2:]):
+            if max(core['bbox'][2:])>=.20*max(selection[2:]):
                 paths=[core]
         value=signature(paths)
         if value:
@@ -238,6 +248,15 @@ class NativeVectorPage:
         aw,ah=sorted(anchor['bbox'][2:]);dims=np.sort(self.bounds[:,2:4],axis=1)
         mask=(dims[:,1]>=ah*.75)&(dims[:,1]<=ah*1.3+2)&(dims[:,0]>=max(0,aw*.65-2))&\
              (dims[:,0]<=aw*1.35+2)&(self.index[:,5]<=len(anchor['segments'])*4+8)
+        from .document_regions import legend_regions, region_for
+        regions=legend_regions(self,items)
+        # Legend exemplars may deliberately use a different drawing scale.
+        # Broaden scale only in a verified legend table; never in the takeoff area.
+        legend_ids=set()
+        for region in regions:
+            legend_ids.update(map(int,self.query(region['rect'])))
+        for i in legend_ids:
+            if ah*.35<=dims[i,1]<=ah*3+2 and dims[i,0]<=aw*3+2:mask[i]=True
         ids=list(np.flatnonzero(mask));seeded=set()
         # Exact native labels prioritize local shape hypotheses, never become
         # detections themselves and never replace the independent text gate.
@@ -259,7 +278,7 @@ class NativeVectorPage:
             path=paths[0]
             if reference.get('core_fill') and not path.get('fill'):continue
             if len(path['segments'])!=len(anchor['segments']):continue
-            for rotation,translation,scale,angle in native_transforms(anchor,path):
+            for rotation,translation,scale,angle in native_transforms(anchor,path,(.4,2.5) if int(i) in legend_ids else (.80,1.25)):
                 box=bbox(reference_points@rotation.T+translation)
                 if not contains([0,0,*self.size],box,.01):continue
                 key=(*[round(v,2) for v in box],round(angle,1))
@@ -288,10 +307,10 @@ class NativeVectorPage:
                      'text_seeded_paths':len(seeded),'geometry_rejected':rejected,'index_bytes':self.index.nbytes,
                      'truncated':self.truncated,'has_images':self.has_images,'index_cache_hit':self.index_cache_hit,
                      'limited_queries':self.limited_queries,'clipped_paths':len(self.clipped),
-                     'clipped_anchor_paths':clipped_relevant}
+                     'clipped_anchor_paths':clipped_relevant,'regions':regions}
 
 
-def native_transforms(anchor,path):
+def native_transforms(anchor,path,scale_range=(.80,1.25)):
     # Longest edge avoids unstable rotations from sub-pixel short edges.
     line=max(anchor['segments'],key=lambda s:math.dist(s['points'][0],s['points'][-1]))
     p0,p1=np.array(line['points'])[[0,-1]];delta=p1-p0;length=np.linalg.norm(delta)
@@ -301,7 +320,7 @@ def native_transforms(anchor,path):
         for reverse in (False,True):
             q0,q1=np.array(edge['points'])[[0,-1]][::-1 if reverse else 1]
             target=q1-q0;scale=np.linalg.norm(target)/length
-            if not .80<=scale<=1.25:continue
+            if not scale_range[0]<=scale<=scale_range[1]:continue
             angle=math.atan2(target[1],target[0])-math.atan2(delta[1],delta[0])
             rotation=np.array([[math.cos(angle),-math.sin(angle)],[math.sin(angle),math.cos(angle)]])*scale
             translation=q0-rotation@p0

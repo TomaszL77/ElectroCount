@@ -22,8 +22,8 @@ class AIEngine:
                     vector_score=hit["graphic_score"] if hit.get("candidate_source")in ("vector","native_shape","native_text_anchor") else None,
                     feature_score=hit.get("feature_score"), geometry_score=hit.get("geometry_score"),
                     text_score=hit.get("text_score") if hit.get("label") else None, spatial_association_score=hit.get("spatial_association_score")))
-        result["pipeline"] = {"version":"stage2-native", "local_only":True,"decision_engine":"DetectionEngineV3",
+        result["pipeline"] = {"version":"stage2-diagnostics-v4", "local_only":True,"decision_engine":"DetectionEngineV4",
             "active":["pdf_structure","candidate_generator","geometry","native_text","local_vector_index","rotated_symbol_layout"],
-            "inactive":["neural_encoder","legend","context_ai","training_collection"],
+            "inactive":["neural_encoder","context_ai","training_collection"],
             "confidence_kind":"heuristic_not_probability"}
         return result
