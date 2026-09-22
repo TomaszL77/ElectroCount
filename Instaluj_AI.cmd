@@ -8,6 +8,10 @@ if not exist "%EC_VENV%\Scripts\python.exe" (
     pause
     exit /b 1
 )
-set "PYTHONPATH=%~dp0src"
-"%EC_VENV%\Scripts\python.exe" -m electrocount.debug_cli --self-test
+"%EC_VENV%\Scripts\python.exe" tools\install_models.py
+if errorlevel 1 (
+    echo Instalacja modelu nie powiodla sie. Zachowaj komunikat bledu.
+    pause
+    exit /b 1
+)
 pause

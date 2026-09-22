@@ -1,3 +1,15 @@
+# Aktualizacja 0.7 — 22.09.2026
+
+Priorytet: skuteczne wyszukiwanie jednego wskazanego wzorca. Brak sprzętowych profili jakości. Klasyczny silnik jest domyślny; DINOv2 + niezależne kafelki + OCR dostępne jako jawna hybryda eksperymentalna. Benchmark nie potwierdził przewagi hybrydy; nie włączać jej domyślnie samym faktem obecności AI.
+
+Aktualna instrukcja i ograniczenia: README.md i docs/one-shot-07.md. Weryfikacja: GUI wybór z legendy L3 = 72 + 1 legenda, zapis/odczyt zgodny. Benchmark klasyczny i hybryda = 72; hybryda nadal dużo wolniejsza. Testy kodów/koloru/obwodów/monochromatyczności przechodzą. Domyślne wyszukiwanie obejmuje wszystkie dokumenty projektu.
+
+Na tym komputerze runtime 0.7: C:/Users/tomci/Documents/Codex/ec07-venv, wskazany w ignorowanym .runtime-path. Skrót pulpitu uruchamia Uruchom.cmd i bierze ten runtime. Nie przenosić środowiska ani .runtime-path na drugi komputer. Instaluj.cmd odtwarza biblioteki z hashami i pobiera model z przypiętej rewizji. Surowe PDF-y, debug, modele i środowiska nie są w Git.
+
+Najważniejszy następny etap: niezależne ręczne adnotacje trudnych symboli na E-01/E-07 i innych projektach, pomiar odzysku propozycji AI oraz kalibracja decyzji. Nie ma dowodu generalizacji na wszystkie oprawy. Zasada: brak pogorszenia precision/recall na dotychczasowych przypadkach.
+
+Poniżej historia wcześniejszych wersji (nie instrukcja bieżącej instalacji).
+
 # Aktualizacja 0.6 — 21.09.2026
 
 Krytyczny problem został odtworzony na kodzie 0.5: zaznaczenie 80×100 pt zawierało 43 ścieżki i dawało 1 wynik. Wybór 40×55 pt dawał 12, a wąski 16×46 pt dawał 72. Poprawka w native_geometry wyodrębnia kompletny wypełniony korpus przy wszystkich tych marginesach; przecięty korpus jest odrzucany z komunikatem. Szczegóły, ograniczenia i dowody: docs/diagnostyka-06.md.

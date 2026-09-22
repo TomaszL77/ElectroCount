@@ -67,6 +67,14 @@ class FakePDF:
         return self.items
 
 
+    def inspect(self,path):return [{'width':400,'height':400}]
+    def render(self,path,page,scale,rect):
+        import numpy as np
+        image=np.full((round(rect[3]*scale),round(rect[2]*scale),3),255,np.uint8)
+        image[2:-2,2:-2]=0
+        return image
+
+
 class FakeMatcher:
     def __init__(self, rects):
         self.rects = rects

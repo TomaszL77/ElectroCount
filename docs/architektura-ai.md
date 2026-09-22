@@ -1,3 +1,5 @@
+> Aktualizacja 0.7: obowiązuje jedna jakość obliczeń; DINOv2 i OCR są dostępne w eksperymentalnej hybrydzie. Aktualny opis: [one-shot-07.md](one-shot-07.md). Poniższy audyt jest historyczny.
+
 > Wersja 0.5: warstwę wykonawczą fasady AI rozszerzono o lokalną geometrię i obracany układ oznaczenia. Szczegóły: [detekcja-05.md](detekcja-05.md). Interfejsy modeli, kontekstu i treningu opisane poniżej zachowano.
 
 # Architektura AI — audyt i etap 1

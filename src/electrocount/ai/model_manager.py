@@ -1,4 +1,4 @@
-"""Local manifest registry. This stage neither loads nor downloads model weights."""
+"""Local manifest registry and verified encoder loading; downloads belong to the installer."""
 from dataclasses import dataclass
 from pathlib import Path
 import hashlib
@@ -38,6 +38,10 @@ class ModelManifest:
 class ModelManager:
     def __init__(self, directory):
         self.directory = Path(directory).resolve()
+
+    def load_visual_encoder(self):
+        from .visual_encoder import DinoV2Encoder
+        return DinoV2Encoder(self.directory/'dinov2-small/8b1f705/model.onnx')
 
     def _manifests(self):
         records = []

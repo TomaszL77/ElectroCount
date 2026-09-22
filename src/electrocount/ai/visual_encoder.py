@@ -1,0 +1,66 @@
+"""Pinned DINOv2-small FP32 encoder; no downloads or hardware-based model selection."""
+from pathlib import Path
+import hashlib
+import numpy as np
+from PIL import Image
+from .contracts import VisualEmbedding, AIExecutionProvider
+
+MODEL_REVISION = '8b1f705a3a7f6f062f6bdd21986c1583d3ef105d'
+MODEL_SHA256 = 'f22797eabf810a75e41de68d378541ebea372122b25c4ce3ef25ff618250c20a'
+
+
+class DinoV2Encoder:
+    name = 'dinov2-small-onnx-fp32'
+    version = MODEL_REVISION
+
+    def __init__(self, path=None):
+        path = Path(path) if path else Path(__file__).resolve().parents[3]/'models/dinov2-small/8b1f705/model.onnx'
+        if not path.is_file():
+            raise RuntimeError('Brak modelu DINOv2. Uruchom Instaluj_AI.cmd. Nie zmieniono silnika automatycznie.')
+        with path.open('rb') as stream:
+            checksum=hashlib.file_digest(stream,'sha256').hexdigest()
+        if checksum != MODEL_SHA256:
+            raise RuntimeError('Nieprawidłowa suma kontrolna DINOv2. Uruchom Instaluj_AI.cmd.')
+        from collections import OrderedDict
+        self.cache=OrderedDict()
+        import onnxruntime as ort
+        options = ort.SessionOptions()
+        options.intra_op_num_threads = 1
+        options.inter_op_num_threads = 1
+        options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
+        options.add_session_config_entry('session.use_deterministic_compute','1')
+        self.session = ort.InferenceSession(str(path),sess_options=options,providers=['CPUExecutionProvider'])
+
+    @staticmethod
+    def preprocess(crop):
+        # Preserve the entire symbol, including thin long luminaires. Pad to a
+        # square before the fixed 224 resize; no distortion or center cropping.
+        image = Image.fromarray(crop.astype(np.uint8)).convert('RGB')
+        side = max(image.size)
+        canvas = Image.new('RGB',(side,side),'white')
+        canvas.paste(image,((side-image.width)//2,(side-image.height)//2))
+        # Explicit retrieval preprocessing v1: resize the padded square to 224,
+        # without the natural-photo center crop that would cut long symbols.
+        canvas = canvas.resize((224,224),Image.Resampling.BICUBIC)
+        x = np.asarray(canvas,dtype=np.float32)/255
+        x = (x-np.array([.485,.456,.406],np.float32))/np.array([.229,.224,.225],np.float32)
+        return np.ascontiguousarray(x.transpose(2,0,1)[None])
+
+    def tokens(self, crop):
+        pixels=self.preprocess(crop)
+        key=hashlib.sha256(pixels.tobytes()).digest()
+        if key not in self.cache:
+            self.cache[key]=self.session.run(None,{'pixel_values':pixels})[0][0]
+            while len(self.cache)>32:self.cache.popitem(last=False)
+        self.cache.move_to_end(key)
+        return self.cache[key]
+
+    def encode(self, crop):
+        vector = self.tokens(crop)[0].astype(np.float64)
+        vector /= max(1e-12,np.linalg.norm(vector))
+        return VisualEmbedding(tuple(vector.tolist()),self.name,self.version,AIExecutionProvider.CPU)
+
+
+def cosine(a,b):
+    return float(np.clip(np.dot(a.values,b.values),0,1))

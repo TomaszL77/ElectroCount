@@ -105,8 +105,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             write_json(data_dir()/"logs"/"runtime_info.json",self.startup_runtime)
         plan = self.performance.plan
         self.jobs.performance_plan = plan.to_dict()
-        self.performance_button.setText(f"{plan.mode} → {plan.effective.title()}" if plan.mode=="AUTO" else plan.effective.title())
-        self.performance_button.setToolTip(f"{plan.reason}\n{self.performance.state}\nKliknij, aby zmienić tryb lub obejrzeć pomiar.")
+        self.performance_button.setText("Stała jakość · CPU")
+        self.performance_button.setToolTip(f"{plan.reason}\n{self.performance.state}\nJednakowa analiza na każdym komputerze.")
 
     def toggle_artifacts(self):
         enabled=not self.settings_store.get("debug/artifacts",False)
@@ -125,6 +125,21 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             self.last_self_test=report
             self.statusBar().showMessage(f"Test diagnostyczny: {report['status']} · {report['actual']} / {report['expected']} · {directory}",60000)
         self.jobs.submit({"kind":"self_test","debug_dir":str(directory)},ready,analysis=True)
+
+    def toggle_template_legend(self):
+        group=self.project.active_group()
+        if not group or not group.template:return
+        self.checkpoint()
+        legend=group.template.get('source')!='LEGEND'
+        group.template['source']='LEGEND' if legend else 'DRAWING'
+        if group.template.get('signature'):group.template['signature']['source_legend']=legend
+        if group.template.get('representation'):group.template['representation']['source']=group.template['source']
+        self.statusBar().showMessage('Zmieniono źródło wzorca. Naciśnij Znajdź, aby przeliczyć wyniki.',12000)
+        self.registry.refresh()
+
+    def toggle_hybrid(self):
+        self.settings_store.set('detection/hybrid',not self.settings_store.get('detection/hybrid',False))
+        self.registry.refresh()
 
     def show_performance(self):
         PerformanceDialog(self.performance,self).exec()
@@ -162,6 +177,11 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("diagnostic_test", "Uruchom test diagnostyczny", "check", self.run_self_test,
                 lambda:not self.busy and not self.loading),
             Command("debug_folder", "Otwórz logi i wycinki", "open", self.open_debug_folder),
+            Command("template_legend", "Wzorzec pochodzi z legendy", "template", self.toggle_template_legend,
+                lambda:active() and bool(self.project.active_group().template),
+                checked=lambda:bool(self.project.active_group() and self.project.active_group().template and self.project.active_group().template.get('source')=='LEGEND')),
+            Command("hybrid", "Hybryda DINOv2 — porównanie eksperymentalne", "settings", self.toggle_hybrid,
+                lambda:not self.busy and not self.loading, checked=lambda:self.settings_store.get('detection/hybrid',False)),
             Command("performance", "Wydajność i sprzęt", "settings", self.show_performance),
             Command("settings", "Próg konfliktu", "settings", self.settings, lambda: not self.busy),
         ]
@@ -176,17 +196,17 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.addToolBar(toolbar)
         self.current_page_only = QCheckBox("Tylko bieżąca strona")
         self.current_page_only.setChecked(self.settings_store.get("search/current_page_only",False))
-        self.current_page_only.setToolTip("Gdy wyłączone: wszystkie strony bieżącego pliku PDF, także poza widokiem.")
+        self.current_page_only.setToolTip("Gdy wyłączone: wszystkie strony wszystkich dokumentów projektu.")
         self.current_page_only.toggled.connect(lambda value: self.settings_store.set("search/current_page_only",value))
         sections = [("Projekt", ["new", "open", "save"]), ("Widok", ["pan", "fit"]),
                     ("Zliczanie", ["group", "template", "find", "manual"]),
-                    ("Edycja", ["undo", "redo"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "performance"])]
+                    ("Edycja", ["undo", "redo"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "template_legend", "hybrid", "performance"])]
         for title, keys in sections:
             menu = self.menuBar().addMenu(title)
             if toolbar.actions():
                 toolbar.addSeparator()
             for key in keys:
-                if key not in ("debug","artifacts","diagnostic_test","debug_folder","performance"):
+                if key not in ("debug","artifacts","diagnostic_test","debug_folder","template_legend","hybrid","performance"):
                     toolbar.addAction(self.registry.actions[key])
                 if key=="find":
                     toolbar.addWidget(self.current_page_only)
@@ -305,7 +325,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         splitter.setSizes([205, 970, 385])
         self.progress = self.operation_progress.bar
         self.cancel_button = self.operation_progress.cancel
-        self.performance_button = QPushButton("AUTO → Eco")
+        self.performance_button = QPushButton("Stała jakość · CPU")
         self.performance_button.clicked.connect(self.show_performance)
         self.statusBar().addPermanentWidget(self.performance_button)
         self.statusBar().showMessage("Gotowe · dokumenty pozostają na tym komputerze")
@@ -331,9 +351,19 @@ class MainWindow(ImportWindowMixin, QMainWindow):
 
     def busy_changed(self, busy):
         self.busy = busy
+        if not hasattr(self,'find_spinner'):
+            self.find_spinner=QTimer(self);self.find_spinner.setInterval(120);self.find_spinner_frame=0
+            self.find_spinner.timeout.connect(self.animate_find)
+        if busy:self.find_spinner.start()
+        else:self.find_spinner.stop()
+        self.registry.actions["find"].setText("Analizuję…" if busy else "Znajdź")
         self.threshold.setEnabled(not busy)
         self.current_page_only.setEnabled(not busy)
         self.registry.refresh()
+
+    def animate_find(self):
+        self.find_spinner_frame=(self.find_spinner_frame+1)%4
+        self.registry.actions['find'].setText('◐◓◑◒'[self.find_spinner_frame]+' Analizuję…')
 
     def checkpoint(self):
         self.history.record(self.project)
@@ -665,6 +695,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 self.refresh()
             self.jobs.submit({"kind": "template", "path": path, "page": source_page, "rect": rect,
                 "selection_context":self.view.last_selection_context,
+                "ocr_enabled":self.settings_store.get("detection/hybrid",False),
                 "debug_dir":str(new_debug_run()) if self.settings_store.get("debug/artifacts",False) else None}, prepared)
         elif self.view.mode == "manual" and group:
             self.checkpoint()
@@ -692,8 +723,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         template_path, template_page = self.project.page_location(template["page"])
         template["page"] = template_page
         document_id = self.project.pages[self.project.page]["document_id"]
-        indices = [self.project.page] if self.current_page_only.isChecked() else [
-            i for i,p in enumerate(self.project.pages) if p["document_id"]==document_id]
+        indices = [self.project.page] if self.current_page_only.isChecked() else list(range(len(self.project.pages)))
         pages = [{"page": i, "path": self.project.page_location(i)[0],
                   "source_page": self.project.page_location(i)[1]} for i in indices]
         def ready(batch):
@@ -712,7 +742,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.jobs.submit({"kind": "batch_match", "pages": pages,
             "template": template, "template_path": template_path, "label": group.label,
             "threshold": self.project.threshold,
-            "config":{"search_scope":"current_page" if self.current_page_only.isChecked() else "current_document",
+            "config":{"search_scope":"current_page" if self.current_page_only.isChecked() else "all_pages",
+                "engine_mode":"hybrid" if self.settings_store.get("detection/hybrid",False) else "classic",
                 "pages":indices,"text_filter":"exact_native","ai_mode":"deterministic_cpu","gui_runtime":self.startup_runtime},
             "debug_dir":str(new_debug_run()) if self.settings_store.get("debug/artifacts",False) else None}, ready, analysis=True)
 

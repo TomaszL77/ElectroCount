@@ -1,19 +1,15 @@
-"""Bounded resource fallback around an atomic operation; quality gates never change."""
+"""Retry memory failures with less cache, never with fewer stages."""
 from dataclasses import replace
 import gc
-from .performance import ExecutionPlan, execution_plan, lower_profile, is_resource_failure
-
+from .performance import execution_plan, is_resource_failure
 
 def run_with_fallback(operation, plan=None, notify=lambda plan:None):
-    current = plan or execution_plan("AUTO")
+    current=plan or execution_plan()
     while True:
-        try:
-            return operation(current)
+        try: return operation(current)
         except Exception as exc:
-            if not is_resource_failure(exc) or current.effective=="ECO":
-                raise
-            current = replace(current,effective=lower_profile(current.effective),
-                cpu_threads=max(1,current.cpu_threads//2),memory_cache_mb=max(8,current.memory_cache_mb//2),
-                provider="CPU",neural_enabled=False,context_enabled=False,reason="Resource fallback")
+            if not is_resource_failure(exc) or (current.memory_cache_mb<=8 and current.provider=='CPU'): raise
+            current=replace(current,cpu_threads=1,memory_cache_mb=max(8,current.memory_cache_mb//2),
+                provider='CPU',reason='Mniejszy cache; ta sama analiza, model i progi.')
             gc.collect()
             notify(current.to_dict())

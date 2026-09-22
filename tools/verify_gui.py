@@ -33,7 +33,7 @@ def step():
   if errors:raise RuntimeError(str(errors))
   if time.monotonic()-start>240:raise RuntimeError('GUI diagnostic timeout: '+phase)
   if phase=='open' and w.view.preview is not None and not w.loading:
-   w.view.resetTransform();w.view.scale(a.zoom,a.zoom);w.view.centerOn(3165,1407);app.processEvents()
+   w.view.resetTransform();w.view.scale(a.zoom,a.zoom);w.view.centerOn(a.selection[0]+a.selection[2]/2,a.selection[1]+a.selection[3]/2);app.processEvents()
    w.registry.invoke('template')
    x,y,sw,sh=a.selection
    left=w.view.mapFromScene(QPointF(x,y));right=w.view.mapFromScene(QPointF(x+sw,y+sh))

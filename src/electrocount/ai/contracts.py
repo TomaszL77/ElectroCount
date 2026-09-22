@@ -12,6 +12,10 @@ class AIExecutionProvider(StrEnum):
 
 @dataclass(frozen=True)
 class SignalBreakdown:
+    visual_ai_score: float | None = None
+    color_score: float | None = None
+    device_label_score: float | None = None
+    text_role_confidence: float | None = None
     vector_score: float | None = None
     embedding_score: float | None = None
     feature_score: float | None = None

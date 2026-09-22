@@ -13,40 +13,12 @@ from test_ai_foundation import measured_report
 PDF=Path(__file__).parent/'fixtures'/'rzut-testowy-demo.pdf'
 
 
-def test_modes_persist_and_service_is_separate_from_pdf_jobs(app,tmp_path):
-    settings=Settings();service=PerformanceController(settings)
-    service.report=measured_report()
-    service.set_mode('MAXIMUM')
-    assert PerformanceController(Settings()).mode.value=='MAXIMUM'
-    service.set_mode('AUTO')
-    assert service.plan.effective=='STANDARD'
-    dialog=PerformanceDialog(service)
-    dialog.show()
-    try:
-        assert dialog.mode.currentData()=='AUTO'
-        dialog.mode.setCurrentIndex(dialog.mode.findData('ECO'))
-        assert service.plan.effective=='ECO'
-        service.apply_fallback({'effective':'ECO'})
-        assert not service.plan.neural_enabled
-        service.start(force=True)
-        wait(app,lambda:service.process is None,timeout=20)
-        assert 'hardware' in service.report
-        assert 'benchmarks' in service.report
-        assert service.plan.effective=='ECO'
-        assert dialog.rerun.isEnabled()
-    finally:
-        dialog.close();service.close()
-
-
-def test_profile_timeout_does_not_block_ui_or_raise_dialog(app):
-    controller=PerformanceController(Settings())
-    controller.start(force=True)
-    # Exercise the watchdog path without spending 15 seconds sleeping.
-    controller._timeout()
-    wait(app,lambda:controller.process is None,timeout=5)
-    assert controller.plan.effective=='ECO'
-    assert '15 s' in controller.report['error']
-    controller.close()
+def test_legacy_mode_is_ignored_without_hardware_process(app):
+    settings=Settings();settings.set('performance/mode','MAXIMUM')
+    service=PerformanceController(settings);service.start()
+    assert service.plan.effective=='DETERMINISTIC' and service.process is None
+    dialog=PerformanceDialog(service);dialog.show();dialog.close()
+    service.set_mode('ECO');assert service.plan.effective=='DETERMINISTIC'
 
 
 def test_gui_native_templates_groups_save_reopen_under_auto(app,tmp_path,monkeypatch):
@@ -72,7 +44,7 @@ def test_gui_native_templates_groups_save_reopen_under_auto(app,tmp_path,monkeyp
         assert len(window.project.detections)==12 and not window.conflicts
         assert sorted((g.label,sum(d.group==g.id for d in window.project.detections)) for g in window.project.groups)==[('A1',8),('QP14',4)]
         window.performance.set_mode('STANDARD')
-        assert window.jobs.performance_plan['effective']=='STANDARD'
+        assert window.jobs.performance_plan['effective']=='DETERMINISTIC'
         window.find_matches();wait(app,lambda:not window.busy)
         assert len(window.project.detections)==12
         assert sum(d.decision=='accepted' for d in window.project.detections)==1

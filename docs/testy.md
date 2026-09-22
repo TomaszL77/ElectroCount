@@ -1,3 +1,18 @@
+# Weryfikacja 0.7 — 22.09.2026
+
+Pełna seria z rzeczywistą halą i pakietem PDF: **131 zaliczonych, 0 błędów**, 624.96 s. Po ostatnich poprawkach wykonano dodatkową serię obejmującą zmienione obszary: **82 zaliczone, 1 pominięty**, 56 s. Pominięcie dotyczyło testu hali bez zmiennej środowiskowej w tej dodatkowej serii; hala została sprawdzona w pełnej serii i osobnym teście GUI. Liczby obejmują powtórzenia tych samych testów, nie sumują się do liczby unikalnych przypadków.
+
+- GUI Qt przy 125%: otwarcie PDF, wybór L3 z legendy, wyszukiwanie, grupa, zapis i ponowne otwarcie projektu; 72 unikalne oprawy + 1 wyłączona legenda, zgodny wynik GUI/serwis, brak błędów.
+- Klasyczny i hybrydowy silnik: 72/72 oprawy na hali, bez FP/FN w ocenianej grupie; dziewięć syntetycznych kodów po 3/3. Pozostałe propozycje REVIEW nie są automatycznie zaliczane jako oprawy.
+- Hybryda nie zwiększyła precision/recall i była wolniejsza, dlatego klasyczny silnik pozostaje domyślny.
+- Testy obejmują dowolne i numeryczne kody, różne położenia tekstu, obwody, kolor i monochromatyczność, prawdziwy encoder DINOv2 i OCR, źródło legendy, wszystkie dokumenty projektu, zgodność renderowania i brak zmiany jakości po OOM.
+- Czyste środowisko 0.7: 30 zgodnych wersji bibliotek, kontrola zależności bez błędów, self-test **12/12**, poprawne ładowanie lokalnych modeli.
+- Po ostatniej zmianie łącznej oceny odtworzono decyzje z 553 zapisanych zestawów sygnałów: brak zmian koszyków, nadal 72. Nie jest to ponowne wykonanie enkodera.
+
+Lokalne dowody w katalogu roboczym zadania: `work/v07-tests-final.xml`, `work/v07-last-changes-tests.xml`, `work/gui-v07-legend/gui-report.json`, `work/benchmark-v07-optimized/benchmark.json`, `work/v07-final-decision-replay.json`. Nie publikujemy prywatnych PDF użytkownika ani pełnych wyników zawierających ich ścieżki. Szczegóły i ograniczenia: [one-shot-07.md](one-shot-07.md). Nie wykonano testu na drugim fizycznym PC.
+
+Poniżej raporty historyczne.
+
 # Weryfikacja 0.6
 
 Pełny zestaw 70 PASS oraz dodatkowe testy diagnostyki. Testy GUI 100/125/150%, czysty runtime i sesja konta Windows użytkownika: 72 oprawy L3 + 1 legenda, jednakowe położenia. Szczegóły: [diagnostyka-06.md](diagnostyka-06.md).

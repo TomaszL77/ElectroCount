@@ -1,11 +1,11 @@
 # ElectroCount — drugi komputer
 
-Kod i testy ElectroCount 0.6.0. Windows, Python 3.12 64-bit.
+Kod i testy ElectroCount 0.7.0. Windows, Python 3.12 64-bit.
 
 1. Zaloguj się do GitHuba na swoje konto. W GitHub Desktop wybierz File → Clone repository i repozytorium ElectroCount. Jeśli korzystasz z paczki ZIP, najpierw rozpakuj cały folder do lokalnego katalogu. Po pobraniu aktualizacji zamknij poprzednią aplikację, uruchom Instaluj.cmd i Uruchom.cmd.
 2. Zainstaluj Python 3.12 64-bit z python.org wraz z Python Launcher. Sprawdzenie: `py -3.12 --version`.
-3. Otwórz folder aplikacji i uruchom Instaluj.cmd. Potrzebny jest internet do pobrania bibliotek. Instalator używa krótkiej ścieżki %LOCALAPPDATA%/ElectroCount/py312-06 i kończy testem PASS 12/12.
-4. Uruchom Uruchom.cmd. Otwórz lokalny PDF. Profil AUTO zmierzy sprzęt tego komputera.
+3. Otwórz folder aplikacji i uruchom Instaluj.cmd. Potrzebny jest internet do pobrania bibliotek. Instalator pobiera również lokalne modele DINOv2 i OCR. Używa krótkiej ścieżki %LOCALAPPDATA%/ElectroCount/py312-07 i kończy testem PASS 12/12.
+4. Uruchom Uruchom.cmd. Otwórz lokalny PDF. Analiza używa tej samej jakości na każdym komputerze.
 5. W swoim narzędziu do pracy z kodem otwórz ten sam lokalny folder. Przeczytaj CONTINUE.md — opisuje dotychczasowe prace i następne kroki.
 
 ## Praca na dwóch komputerach

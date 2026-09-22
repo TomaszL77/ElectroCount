@@ -16,6 +16,9 @@ class PdfTextItem:
     bbox: list[float]  # x, y, width, height in display-page points
     center: list[float]
 
+    source: str = "pdf_native"
+    confidence: float = 1.0
+
     def to_dict(self):
         return asdict(self)
 
@@ -49,18 +52,16 @@ class TextEngine:
         cx, cy = x+w/2, y+h/2
         radius = max(24, max(w, h)*2.5)
         ranked = []
+        associated = []
+        from .text_roles import TextRoleClassifier
+        roles = TextRoleClassifier()
         seen = set()
         for value in (items.near(rect,radius) if hasattr(items,"near") else items):
             item = as_item(value)
-            # Codes may contain letters, numbers and separators. Do not guess O/0 or I/1.
-            if not re.fullmatch(r"[\w/.-]{1,24}", item.normalized_text) or not any(c.isalpha() for c in item.normalized_text):
-                continue
             key=(item.normalized_text,*[round(v,2) for v in item.bbox])
             if key in seen: continue
             seen.add(key)
-            # Electrical quantities are annotations, not device identifiers.
-            if re.fullmatch(r"\d+(?:[.,]\d+)?(?:W|KW|V|KV|MA|HZ|MM|MM2|M2)", item.normalized_text):
-                continue
+            role, role_confidence = roles.classify(item.normalized_text)
             tx, ty, tw, th = item.bbox
             gap_x = max(x-(tx+tw), tx-(x+w), 0)
             gap_y = max(y-(ty+th), ty-(y+h), 0)
@@ -88,17 +89,23 @@ class TextEngine:
             elif layout and layout.get("text_height"):
                 size_ratio=th/max(h*layout["text_height"],.1)
                 score*=math.exp(-abs(math.log(max(size_ratio,.01)))*.15)
+            position = ('INSIDE' if intersection(rect,item.bbox) else
+                'RIGHT' if tx >= x+w else 'LEFT' if tx+tw <= x else 'ABOVE' if ty+th <= y else 'BELOW')
+            associated.append({**item.to_dict(),'distance':gap,'position':position,
+                'role':role,'role_score':role_confidence,'spatial_score':score})
+            if role != 'DEVICE_LABEL': continue
+            if ' ' in item.normalized_text: score *= .8
             ranked.append((score, item, {"dx": dx, "dy": dy, "text_height": th/max(h,1),
                 "offset": [(item.center[0]-cx)/max(w,h,1),(item.center[1]-cy)/max(w,h,1)],
                 "glyph_size":min(tw,th)}))
-        ranked.sort(key=lambda row: row[0], reverse=True)
+        ranked.sort(key=lambda row: (-row[0],row[1].bbox[1],row[1].bbox[0],row[1].normalized_text))
         if not ranked:
-            return {"item": None, "score": 0.0, "reason": "missing_label"}
+            return {"item": None, "score": 0.0, "reason": "missing_label", "associated_texts": associated}
         best = ranked[0]
         if best[0] < .60 or (len(ranked)>1 and best[0]-ranked[1][0] < .10):
             return {"item": None, "score": best[0], "reason": "ambiguous_label",
-                    "alternatives": [row[1].to_dict() for row in ranked[:3]]}
-        return {"item": best[1], "score": best[0], "layout": best[2], "reason": "native_text"}
+                    "alternatives": [row[1].to_dict() for row in ranked[:3]], "associated_texts": associated}
+        return {"item": best[1], "score": best[0], "layout": best[2], "reason": "ocr_text" if best[1].source=="ocr" else "native_text", "associated_texts": associated, "text_role_confidence": roles.classify(best[1].normalized_text)[1]}
 
 
 def prepare_template(engine, path, page, selection):
@@ -113,6 +120,10 @@ def prepare_template(engine, path, page, selection):
         try:
             with engine.open_vector_page(path,page) as native:
                 signature=native.template_signature(selection,items)
+                if signature:
+                    from .document_regions import legend_regions, region_for
+                    if region_for(signature['bbox'],legend_regions(native,items)):
+                        signature['source_legend']=True
         except (RuntimeError,AttributeError) as exc:
             import logging
             logging.warning("Native template unavailable; CPU raster fallback: %s",exc)
@@ -147,13 +158,16 @@ def prepare_template(engine, path, page, selection):
         meta=engine.inspect(path)[page];x,y,w,h=rect
         left,top=max(0,x-3),max(0,y-3)
         raster_rect=[left,top,min(meta["width"],x+w+3)-left,min(meta["height"],y+h+3)-top]
-    return {"page": page, "raster_rect":raster_rect, "selection_rect": selection, "rect": rect, "signature": signature,
+    return {"source": "LEGEND" if signature and signature.get('source_legend') else "DRAWING",
+            "associated_texts":association.get('associated_texts',[]),
+            "text_role_confidence":association.get('text_role_confidence',0),
+            "page": page, "raster_rect":raster_rect, "selection_rect": selection, "rect": rect, "signature": signature,
             "label": item.normalized_text if item else "",
             "association": association.get("layout"),
             "label_item": item.to_dict() if item else None,
             "spatial_association_score": association["score"],
             "reason": association["reason"], "text_aware": True,
-            "definition_version": 4, "geometry_source": "native_local" if signature else "raster",
+            "definition_version": 5, "geometry_source": "native_local" if signature else "raster",
             "text_bbox":item.bbox if item else None,
             "self_check":bool(signature),
             "possible_label": (association.get("alternatives") or [{}])[0].get("normalized_text", "")}

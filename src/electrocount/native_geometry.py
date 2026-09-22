@@ -257,6 +257,8 @@ class NativeVectorPage:
             legend_ids.update(map(int,self.query(region['rect'])))
         for i in legend_ids:
             if ah*.35<=dims[i,1]<=ah*3+2 and dims[i,0]<=aw*3+2:mask[i]=True
+        if reference.get('source_legend'):
+            mask=(dims[:,1]>=ah*.35)&(dims[:,1]<=ah*3+2)&(dims[:,0]<=aw*3+2)&(self.index[:,5]<=len(anchor['segments'])*4+8)
         ids=list(np.flatnonzero(mask));seeded=set()
         # Exact native labels prioritize local shape hypotheses, never become
         # detections themselves and never replace the independent text gate.
@@ -278,7 +280,7 @@ class NativeVectorPage:
             path=paths[0]
             if reference.get('core_fill') and not path.get('fill'):continue
             if len(path['segments'])!=len(anchor['segments']):continue
-            for rotation,translation,scale,angle in native_transforms(anchor,path,(.4,2.5) if int(i) in legend_ids else (.80,1.25)):
+            for rotation,translation,scale,angle in native_transforms(anchor,path,(.35,3.0) if reference.get('source_legend') or int(i) in legend_ids else (.80,1.25)):
                 box=bbox(reference_points@rotation.T+translation)
                 if not contains([0,0,*self.size],box,.01):continue
                 key=(*[round(v,2) for v in box],round(angle,1))
@@ -298,7 +300,9 @@ class NativeVectorPage:
                     if colored:nearby=colored
                 evidence=generator.verify(reference,nearby,rotation,translation,box)
                 if evidence['verified']:
+                    from .color_features import native_color_signature
                     hits.append({'rect':box,'score':evidence['graphic_score'],'rotation':angle,'scale':scale,
+                        'color_signature':native_color_signature(nearby),
                         'source':'native_text_anchor' if int(i) in seeded else 'native_shape',**evidence})
                 else:rejected+=1
             if k%25==0:progress(round(100*k/max(1,len(ids))))

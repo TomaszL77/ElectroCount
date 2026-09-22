@@ -7,7 +7,7 @@ class ResultsManager:
     def apply(self, project, group_id, page, result):
         group = next(g for g in project.groups if g.id == group_id)
         updated_template=result.get("template",{})
-        if updated_template.get("definition_version",0)>(group.template or {}).get("definition_version",0):
+        if updated_template.get("definition_version",0)>=(group.template or {}).get("definition_version",0) and updated_template.get("representation"):
             group.template={**updated_template,"page":(group.template or {}).get("page",page)}
         if not group.label:
             group.label = result["label"]

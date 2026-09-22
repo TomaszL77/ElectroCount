@@ -21,7 +21,7 @@ def test_builtin_self_test_exports_actual_evidence(tmp_path):
     assert (tmp_path/'diagnostic/template_crop.png').is_file()
     assert (tmp_path/'diagnostic/page_render.png').is_file()
     assert len(list((tmp_path/'diagnostic').glob('candidate_*.png')))==12
-    assert log['actual_matcher_renders']==[]  # native geometry, no fabricated bitmap input
+    assert log['actual_matcher_renders']==[]  # native geometry and native color, no invented renders
 
 
 @pytest.mark.parametrize('zoom',[.2,1,5])

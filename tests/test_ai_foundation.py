@@ -27,55 +27,8 @@ def measured_report(ram=8000):
                           "feature_extraction":{"status":"measured","median_ms":25}}}
 
 
-def test_auto_uses_measured_cpu_and_free_memory_not_gpu_name():
-    assert execution_plan("AUTO",measured_report()).effective=="STANDARD"
-    assert execution_plan("AUTO",measured_report(500)).effective=="ECO"
-    report=measured_report();report['benchmarks']['feature_extraction']['median_ms']=400
-    assert execution_plan("AUTO",report).effective=="ECO"
-    report['benchmarks']={}
-    assert execution_plan("AUTO",report).effective=="ECO"
-    assert execution_plan("corrupt-value").effective=="ECO"
-
-
-@pytest.mark.parametrize('mode',['ECO','STANDARD','ENHANCED','MAXIMUM'])
-def test_forced_profiles_do_not_activate_missing_models(mode):
-    plan=execution_plan(mode,measured_report())
-    assert plan.effective==mode and plan.provider=='CPU'
-    assert not plan.neural_enabled and not plan.context_enabled
-    assert 1<=plan.cpu_threads<=7
-
-
-def test_oom_steps_down_with_bounded_attempts_and_no_partial_publication():
-    calls=[];notices=[]
-    def operation(plan):
-        calls.append(plan.effective)
-        partial_result=['not published']
-        if plan.effective!='ECO':
-            raise MemoryError()
-        return ['complete']
-    assert run_with_fallback(operation,execution_plan('MAXIMUM',measured_report()),notices.append)==['complete']
-    assert calls==['MAXIMUM','ENHANCED','STANDARD','ECO']
-    assert [n['effective'] for n in notices]==['ENHANCED','STANDARD','ECO']
-    with pytest.raises(MemoryError):
-        run_with_fallback(lambda _:(_ for _ in ()).throw(MemoryError()),execution_plan('ECO'))
-
-
-def test_backend_error_falls_back_to_cpu_but_invalid_pdf_does_not_retry():
-    calls=[]
-    def backend(plan):
-        calls.append(plan)
-        if plan.provider!='CPU':
-            raise BackendResourceError('GPU backend unavailable')
-        return 'ok'
-    plan=replace(execution_plan('ENHANCED',measured_report()),provider='WinML')
-    assert run_with_fallback(backend,plan)=='ok'
-    assert len(calls)==2 and calls[-1].effective=='STANDARD' and calls[-1].provider=='CPU'
-    calls.clear()
-    def invalid(plan):
-        calls.append(plan)
-        raise ValueError('Corrupt PDF')
-    with pytest.raises(ValueError):run_with_fallback(invalid,plan)
-    assert len(calls)==1
+def test_fixed_execution_ignores_hardware():
+    assert execution_plan('MAXIMUM',measured_report())==execution_plan('ECO',measured_report(500))
 
 
 def test_profiler_cache_keeps_live_available_ram_and_invalidates_hardware(tmp_path,monkeypatch):
@@ -90,7 +43,7 @@ def test_profiler_cache_keeps_live_available_ram_and_invalidates_hardware(tmp_pa
     hardware['available_ram_mb']=400
     second=profiler.run(cache)
     assert second['cached'] and second['hardware']['available_ram_mb']==400
-    assert execution_plan('AUTO',second).effective=='ECO'
+    assert execution_plan('AUTO',second).effective=='DETERMINISTIC'
     hardware['cpu']={'logical_cores':2,'physical_cores':2}
     assert not profiler.run(cache)['cached']
     cache.write_text('broken',encoding='utf-8')
@@ -101,7 +54,7 @@ def test_profiler_exhausted_budget_is_explicit_not_fake_measurement(tmp_path,mon
     profiler=HardwareProfiler();monkeypatch.setattr(profiler,'collect',lambda:measured_report()['hardware'])
     report=profiler.run(tmp_path/'cache.json',budget_seconds=0)
     assert report['benchmarks']['pdf_render']['status']=='skipped'
-    assert execution_plan('AUTO',report).effective=='ECO'
+    assert execution_plan('AUTO',report).effective=='DETERMINISTIC'
 
 
 def test_local_model_registry_checksum_and_traversal(tmp_path):
@@ -140,7 +93,7 @@ def test_ai_facade_preserves_exact_counts_and_save(mode,tmp_path):
     classic=DetectionEngine(engine).find(path,0,template,'QP14')
     result=AIEngine(engine).find(path,0,template,'QP14')
     for bucket in ('matches','review','discovered_other_label'):
-        assert [{k:v for k,v in h.items() if k!='signals'} for h in result[bucket]]==classic[bucket]
+        assert result[bucket]==classic[bucket]
     assert len(result['matches'])==4 and len(result['discovered_other_label'])==8
     assert result['stages']['vector_first'] and not result['stages']['raster_used']
     assert all(h['signals']['embedding_score'] is None for h in result['matches'])

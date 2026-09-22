@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-set "EC_VENV=%LOCALAPPDATA%\ElectroCount\py312-06"
+set "EC_VENV=%LOCALAPPDATA%\ElectroCount\py312-07"
 if defined ELECTROCOUNT_RUNTIME_DIR set "EC_VENV=%ELECTROCOUNT_RUNTIME_DIR%"
 where py >nul 2>nul
 if errorlevel 1 (
@@ -17,6 +17,8 @@ if errorlevel 1 goto fail
 "%EC_VENV%\Scripts\python.exe" -m pip check
 if errorlevel 1 goto fail
 "%EC_VENV%\Scripts\python.exe" check_runtime.py
+if errorlevel 1 goto fail
+"%EC_VENV%\Scripts\python.exe" tools\install_models.py
 if errorlevel 1 goto fail
 set "PYTHONPATH=%~dp0src"
 "%EC_VENV%\Scripts\python.exe" -m electrocount.debug_cli --self-test

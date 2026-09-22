@@ -9,7 +9,8 @@ from .domain import overlap_metrics
 
 
 class DetectionEngine:
-    def __init__(self,pdf_engine,matcher=None,text_engine=None,feature_matcher=None):
+    def __init__(self,pdf_engine,matcher=None,text_engine=None,feature_matcher=None,visual_encoder=None):
+        self.encoder=visual_encoder
         self.pdf=pdf_engine
         self.matcher=matcher or TemplateMatcher()
         self.custom_matcher=matcher is not None
@@ -19,7 +20,7 @@ class DetectionEngine:
     def find(self,path,page,template,label="",threshold=.82,progress=lambda p:None,template_path=None,status=lambda text:None):
         status("Odczyt tekstu i przygotowanie wzorca")
         source=template_path or path
-        if not template.get("text_aware") or (template.get("definition_version",0)<4 and
+        if not template.get("text_aware") or (template.get("definition_version",0)<5 and
                 template.get("selection_rect") and hasattr(self.pdf,"open_vector_page")):
             template=prepare_template(self.pdf,source,template["page"],template.get("selection_rect",template["rect"]))
         expected=normalize_text(label or template.get("label",""))
@@ -65,6 +66,15 @@ class DetectionEngine:
             except ValueError as exc:
                 if not native_stats or not proposals:raise
                 warnings.append("Analiza obrazu niepełna: "+str(exc))
+        retrieval_stats={}
+        if self.encoder:
+            from .ai.retrieval import VisualRetrieval
+            status('Analiza AI: przeszukiwanie wszystkich kafelków strony')
+            reference_image=mask_text(self.pdf.render(source,template['page'],2.,template.get('raster_rect',template['rect'])),
+                template_items,template.get('raster_rect',template['rect']),2.)
+            recovered,retrieval_stats=VisualRetrieval(self.encoder).find(self.pdf,path,page,template,reference_image,items,
+                lambda p:progress(30+round(p*.2)))
+            proposals.extend(recovered)
         progress(50)
         status("Weryfikacja cech i geometrii kandydatów")
         reference=None
@@ -84,14 +94,34 @@ class DetectionEngine:
                 verified.append(candidate)
             else:
                 rejected.append({k:candidate.get(k) for k in
-                    ("rect","template_score","feature_score","geometry_score","verification_method","verification_reason")})
+                    ("rect","template_score","feature_score","geometry_score","verification_method","verification_reason")}|{'status':'REJECTED',
+                        'reason':candidate.get('verification_reason','geometry_not_verified'),
+                        'signals':{'visual_ai_score':None,'color_score':None,'text_score':None,
+                            'geometry_score':candidate.get('geometry_score'),'feature_score':candidate.get('feature_score')},
+                        'unevaluated_reason':'failed_geometry_gate'})
             progress(50+round(35*(index+1)/max(1,len(proposals))))
         # Symmetric shapes permit several rotations. Resolve the orientation
         # with spatial text evidence, without favoring the requested code.
         text_index=TextSpatialIndex(items)
+        ocr=None
+        if self.encoder:
+            from .ocr_engine import OCREngine
+            ocr=OCREngine()
         for candidate in verified:
             candidate["association_result"]=self.text.associate(candidate["rect"],text_index,
-                transformed_layout(template.get("association"),candidate.get("rotation",0),candidate.get("scale",1)))
+                None if template.get("source")=="LEGEND" else transformed_layout(template.get("association"),candidate.get("rotation",0),candidate.get("scale",1)))
+        # Learn repeated layout from unambiguous neighbors on this page, never
+        # from the requested label. Legend typography/rotation is often different.
+        if template.get('source')=='LEGEND':
+            from .text_layout import resolve_repeated_layout
+            resolve_repeated_layout(verified,self.text,text_index)
+        if ocr:
+            status('OCR: sprawdzanie kandydatów bez tekstu PDF')
+            for candidate in verified:
+                if not candidate['association_result']['item']:
+                    recognized=ocr.read_region(self.pdf,path,page,candidate['rect'],text_index.near(candidate['rect'],80))
+                    if recognized:
+                        candidate['association_result']=self.text.associate(candidate['rect'],recognized)
         candidates=[]
         for candidate in sorted(verified,key=lambda c:(c["geometry_score"]+c["feature_score"]+
                 .2*c["association_result"]["score"]),reverse=True):
@@ -99,15 +129,28 @@ class DetectionEngine:
                 candidates.append(candidate)
         result={"matches":[],"review":[],"discovered_other_label":[],"label":expected,
                 "template":template,"coverage_warnings":warnings,"text_items":[i.to_dict() for i in items],
-                "rejected_candidates":rejected[:500],
+                "rejected_candidates":rejected,
                 "stages":{"generated":len(proposals),"verified":len(candidates),"rejected":len(rejected),
-                          "vector_first":bool(signature and vectors),"raster_used":use_raster,
+                          "ai_retrieval":retrieval_stats,"vector_first":bool(signature and vectors),"raster_used":use_raster,
                           "vector_limit_reached":bool(vectors and vectors.get("truncated")),"native_local":native_stats}}
         progress(85)
         status("Łączenie symboli z oznaczeniami tekstowymi")
         associations=[c["association_result"] for c in candidates]
         owners=Counter(tuple(a["item"].bbox) for a in associations if a["item"])
-        for candidate,association in zip(candidates,associations):
+        from .color_features import color_signature, color_similarity
+        from .final_decision import FinalDecisionEngine
+        from .template_representation import build_representation
+        if not template.get('representation'):
+            template['representation']=build_representation(self.pdf,source,template['page'],template)
+        reference_color=template['representation']['color_signature']
+        reference_embedding=None
+        if self.encoder:
+            from dataclasses import asdict
+            reference_embedding=self.encoder.encode(reference_image)
+            template['representation']['visual_embedding']=asdict(reference_embedding)
+        if self.encoder:status('Analiza AI i koloru: ocena podobieństwa kandydatów')
+        for hit_index,(candidate,association) in enumerate(zip(candidates,associations)):
+            progress(85+round(14*(hit_index+1)/max(1,len(candidates))))
             item=association["item"]
             if item and owners[tuple(item.bbox)]>1:
                 item=None
@@ -126,24 +169,57 @@ class DetectionEngine:
                  "verification_details":{k:candidate.get(k) for k in ("inliers","feature_matches","inlier_coverage",
                     "transform","scale","rotation","verification_reason","chamfer_error")},
                  "candidate_source":candidate.get("source","custom")}
-            if not expected:
-                hit["reason"]="unlabelled_symbol_geometry_verified"
-                result["matches"].append(hit)
-            elif not actual:
-                result["review"].append(hit)
-            elif exact:
-                result["matches"].append(hit)
+            crop_box=candidate.get('verification_rect',candidate['rect'])
+            cx,cy,cw,ch=crop_box
+            if min(cw,ch)<3:
+                meta=self.pdf.inspect(path)[page];left,top=max(0,cx-3),max(0,cy-3)
+                crop_box=[left,top,min(meta['width'],cx+cw+3)-left,min(meta['height'],cy+ch+3)-top]
+            candidate_color=candidate.get('color_signature')
+            if candidate_color is None or self.encoder:
+                patch=mask_text(self.pdf.render(path,page,2.,crop_box),items,crop_box,2.)
+                if candidate_color is None:candidate_color=color_signature(patch)
+            visual=None
+            if self.encoder:
+                from .ai.visual_encoder import cosine
+                import numpy as np
+                angle=candidate.get('rotation',0)
+                aligned=np.rot90(patch,int(round(angle/90))%4).copy() if abs(angle/90-round(angle/90))<.03 else patch
+                visual=cosine(reference_embedding,self.encoder.encode(aligned))
+            signals={'visual_ai_score':visual,'embedding_score':visual,'geometry_score':geometry,
+                'feature_score':feature,'color_score':color_similarity(reference_color,candidate_color),
+                'device_label_score':(float(exact) if expected else None),
+                'text_score':(float(exact) if expected else None),
+                'text_role_confidence':association.get('text_role_confidence',0),
+                'spatial_text_score':spatial,'spatial_association_score':spatial}
+            if item and item.source=='ocr':
+                signals['text_score']=signals['device_label_score']=item.confidence if exact else 0.
+            state,confidence,decision_reason=FinalDecisionEngine().decide(expected,actual,signals)
+            if item and item.source=='ocr' and item.confidence<.95 and state=='MATCH':
+                state,decision_reason='REVIEW','uncertain_ocr_label'
+            hit['text_source']=item.source if item else None
+            hit.update(signals=signals,confidence=confidence,color_score=signals['color_score'],
+                visual_ai_score=visual,status=state,text_role='DEVICE_LABEL' if actual else 'UNKNOWN',
+                text_role_confidence=signals['text_role_confidence'])
+            hit['verification_details'].update(associated_texts=association.get('associated_texts',[]),
+                color_signature=candidate_color,final_decision_reason=decision_reason)
+            if state=='MATCH':
+                if not expected:hit['reason']='unlabelled_symbol_geometry_verified'
+                result['matches'].append(hit)
+            elif state=='OTHER_VARIANT':
+                hit['reason']='different_label'
+                result['discovered_other_label'].append(hit)
             else:
-                hit["reason"]="different_label"
-                result["discovered_other_label"].append(hit)
+                hit['reason']=association['reason'] if association['reason']=='shared_label' else decision_reason
+                result['review'].append(hit)
         from .document_regions import region_for
         regions=native_stats.get('regions',[])
         result['legend_matches']=[]
         countable=[]
         for hit in result['matches']:
             region=region_for(hit['rect'],regions)
-            if region:
-                result['legend_matches'].append({**hit,'reason':'legend_reference','region':region['rect']})
+            is_source=template.get('source')=='LEGEND' and source==path and page==template['page'] and overlap_metrics(hit['rect'],template['rect'])[0]>.5
+            if region or is_source:
+                result['legend_matches'].append({**hit,'status':'SOURCE_TEMPLATE' if is_source else 'LEGEND_REFERENCE','reason':'legend_reference','region':region['rect'] if region else template['rect']})
             else:countable.append(hit)
         result['matches']=countable
         result['counts']={'raw_matches':len(countable)+len(result['legend_matches']),
