@@ -1,3 +1,13 @@
+# Aktualizacja 0.7.1 — 23.09.2026
+
+Poprawiono wyszukiwanie złożonych symboli CAD, rozróżnienie pustych/wypełnionych figur, oddzielenie przewodów i tła, zakres fallbacku rastrowego oraz wyłączenie tabel legend i potwierdzonych ramek uwag bez natywnego tekstu. Szczegóły: docs/cpp203-071.md. Definicja wzorca 6; stare wzorce są przygotowywane ponownie. Runtime i zależności pozostają 0.7, nie tworzyć nowego środowiska bez potrzeby.
+
+Końcowe testy: 144 PASS, 0 błędów, 0 pominiętych (654,39 s), z rzeczywistą halą, pakietem PDF i CPP203. CPP203: L1=113, L1-1=76, brak wspólnych pozycji. GUI Qt przy 125%: rzeczywisty wybór myszą, 113 L1, 4 wyłączone ilustracje, identyczny hash GUI/serwis, zgodny zapis/odczyt. Nie traktować tych ilości jako kompletnego ground truth. Kilka silnie zasłoniętych symboli nadal wymaga ręcznej kontroli; EX świadomie poza automatycznym rozróżnieniem.
+
+Następny etap: pełne ręczne adnotacje typów na trudnych PDF, pomiar FP/FN i odzyskiwanie zasłoniętych symboli bez mieszania wariantów. Narzędzie tools/benchmark_cpp203.py sprawdza 8 wzorców przez ten sam serwis co GUI. Prywatnego PDF ani wygenerowanych projektów nie publikować w repo. Dotychczasowy silnik klasyczny pozostaje domyślny, hybryda eksperymentalna.
+
+Poniżej historia wcześniejszych wersji.
+
 # Aktualizacja 0.7 — 22.09.2026
 
 Priorytet: skuteczne wyszukiwanie jednego wskazanego wzorca. Brak sprzętowych profili jakości. Klasyczny silnik jest domyślny; DINOv2 + niezależne kafelki + OCR dostępne jako jawna hybryda eksperymentalna. Benchmark nie potwierdził przewagi hybrydy; nie włączać jej domyślnie samym faktem obecności AI.

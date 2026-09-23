@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import numpy as np
 import pypdfium2 as pdfium
-from .vector_engine import bbox, contains, signature, sample_segment, VectorCandidateGenerator
+from .vector_engine import bbox, contains, signature, sample_segment, VectorCandidateGenerator, without_paint_caps, painted_fill
 
 
 def _style(obj):
@@ -88,7 +88,7 @@ def _path_key(path):
     # Repeated CAD overprints must not become additional geometric features.
     edges=[]
     for s in path['segments']:
-        points=tuple(tuple(round(v,3) for v in p) for p in s['points'])
+        points=tuple(tuple(round(v,2) for v in p) for p in s['points'])
         edges.append((s['kind'],min(points,points[::-1])))
     return tuple(sorted(edges))
 
@@ -112,14 +112,16 @@ class NativeVectorPage:
         self.max_segments=max_segments;self.max_paths=max_paths
         w,h=self.page.get_size();self.size=(w,h)
         self.converter=pdfium.PdfPosConv(self.page,(0,0,round(w*1000),round(h*1000),0))
-        self.parents={};self.nested={};self.has_images=False;self.truncated=False;self.decoded=0;self.index_cache_hit=False
+        self.parents={};self.nested={};self.image_regions=[];self.has_images=False;self.truncated=False;self.decoded=0;self.index_cache_hit=False
         self.cache={};self.cache_segments=0;self.limited_queries=0;self.clipped=set();self.clipped_info={}
         source=Path(path);stat=source.stat()
-        key=hashlib.sha256(json.dumps(['native-v2',str(source.resolve()),stat.st_size,stat.st_mtime_ns,page_index,max_paths]).encode()).hexdigest()
+        key=hashlib.sha256(json.dumps(['native-v3',str(source.resolve()),stat.st_size,stat.st_mtime_ns,page_index,max_paths]).encode()).hexdigest()
         self.cache_file=Path(cache_directory)/(key+'.npz') if cache_directory else None
         try:
             if not self._load_index():
                 self._index();self._save_index()
+            self.x_order=np.argsort(self.bounds[:,0],kind="stable")
+            self.x_sorted=self.bounds[self.x_order,0]
         except BaseException: self.close();raise
 
     def __enter__(self):return self
@@ -136,6 +138,7 @@ class NativeVectorPage:
                 count=pdfium.raw.FPDFPage_CountObjects(self.page)
                 if len(index) and (index[:,4].min()<0 or index[:,4].max()>=count or not np.equal(index[:,4],np.floor(index[:,4])).all()):return False
                 self.index=index;self.bounds=index[:,:4]
+                self.image_regions=cached['image_regions'].tolist()
                 self.has_images=bool(cached['has_images']);self.truncated=bool(cached['truncated'])
             self.index_cache_hit=True;return True
         except (OSError,ValueError,KeyError):return False
@@ -148,7 +151,7 @@ class NativeVectorPage:
         try:
             self.cache_file.parent.mkdir(parents=True,exist_ok=True)
             with temporary.open('wb') as stream:
-                np.savez_compressed(stream,index=self.index,has_images=self.has_images,truncated=self.truncated)
+                np.savez_compressed(stream,index=self.index,has_images=self.has_images,truncated=self.truncated,image_regions=np.asarray(self.image_regions).reshape(-1,4))
             temporary.replace(self.cache_file)
         except OSError:temporary.unlink(missing_ok=True)
 
@@ -156,7 +159,14 @@ class NativeVectorPage:
         chunks=[];rows=[];n=0;root_index=-1
         for obj in self.page.get_objects():
             if obj.level==0:root_index+=1
-            if obj.type==pdfium.raw.FPDF_PAGEOBJ_IMAGE:self.has_images=True
+            if obj.type==pdfium.raw.FPDF_PAGEOBJ_IMAGE:
+                self.has_images=True
+                l,b,r,t=obj.get_bounds();points=[(l,b),(l,t),(r,b),(r,t)]
+                parent=obj.container
+                while parent is not None:
+                    matrix=parent.get_matrix();points=[matrix.on_point(*p) for p in points];parent=parent.container
+                pixels=np.asarray([self.converter.to_bitmap(*p) for p in points])/1000
+                self.image_regions.append(bbox(pixels))
             if obj.type!=pdfium.raw.FPDF_PAGEOBJ_PATH:continue
             if n>=self.max_paths:self.truncated=True;break
             l,b,r,t=obj.get_bounds();points=[(l,b),(l,t),(r,b),(r,t)]
@@ -177,8 +187,11 @@ class NativeVectorPage:
 
     def query(self,rect,tolerance=.6):
         x,y,w,h=rect;b=self.bounds
-        return np.flatnonzero((b[:,0]>=x-tolerance)&(b[:,1]>=y-tolerance)&
-            (b[:,0]+b[:,2]<=x+w+tolerance)&(b[:,1]+b[:,3]<=y+h+tolerance))
+        lo=np.searchsorted(self.x_sorted,x-tolerance,'left')
+        hi=np.searchsorted(self.x_sorted,x+w+tolerance,'right')
+        ids=self.x_order[lo:hi];local=b[ids]
+        valid=(local[:,1]>=y-tolerance)&(local[:,0]+local[:,2]<=x+w+tolerance)&(local[:,1]+local[:,3]<=y+h+tolerance)
+        return np.sort(ids[valid])
 
     def decode(self,ids):
         if sum(self.index[int(i),5] for i in ids)>self.max_segments:
@@ -234,21 +247,35 @@ class NativeVectorPage:
             # objects; overlapping annotations and wire continuations aren't.
             if max(core['bbox'][2:])>=.20*max(selection[2:]):
                 paths=[core]
+        # A thin conduit/channel drawn through a fixture may continue across
+        # many devices on the plan. Its sample end caps are not device ends.
+        context_paths=[]
+        for p in paths:
+            others=[q for q in paths if q is not p]
+            if not others or p.get('fill') or len(p['segments'])!=4 or any(e['kind']!='line' for e in p['segments']):continue
+            ob=bbox([v for q in others for e in q['segments'] for v in e['points']])
+            x,y,w,h=p['bbox'];ox,oy,ow,oh=ob
+            horizontal=w>h and h<oh*.4 and x<ox-.1*ow and x+w>ox+ow+.1*ow and y>=oy and y+h<=oy+oh
+            vertical=h>w and w<ow*.4 and y<oy-.1*oh and y+h>oy+oh+.1*oh and x>=ox and x+w<=ox+ow
+            if horizontal or vertical:context_paths.append(p)
+        if context_paths:paths=[p for p in paths if all(p is not q for q in context_paths)]
         value=signature(paths)
         if value:
             value['native_local']=True
+            value['context_paths']=context_paths
             value['foreground']=foreground
             value['core_fill']=len(paths)==1 and bool(paths[0].get('fill'))
         return value
 
     def find(self,reference,items=(),expected='',progress=lambda p:None):
-        anchor=max(reference['paths'],key=lambda p:max(p['bbox'][2:])*math.sqrt(min(64,len(p['segments']))))
+        anchor_pool=[p for p in reference['paths'] if len(p['segments'])>=3] or reference['paths']
+        anchor=max(anchor_pool,key=lambda p:max(p['bbox'][2:])*math.sqrt(min(64,len(p['segments']))))
         # Bounds include stroke expansion. Use a generous coarse filter; the
         # full native contour and dimensions are verified below.
         aw,ah=sorted(anchor['bbox'][2:]);dims=np.sort(self.bounds[:,2:4],axis=1)
         mask=(dims[:,1]>=ah*.75)&(dims[:,1]<=ah*1.3+2)&(dims[:,0]>=max(0,aw*.65-2))&\
              (dims[:,0]<=aw*1.35+2)&(self.index[:,5]<=len(anchor['segments'])*4+8)
-        from .document_regions import legend_regions, region_for
+        from .document_regions import legend_regions, region_for, reference_frames
         regions=legend_regions(self,items)
         # Legend exemplars may deliberately use a different drawing scale.
         # Broaden scale only in a verified legend table; never in the takeoff area.
@@ -278,15 +305,17 @@ class NativeVectorPage:
                     clipped_relevant+=1
                 continue
             path=paths[0]
+            if painted_fill(anchor)!=painted_fill(path):continue
             if reference.get('core_fill') and not path.get('fill'):continue
             if len(path['segments'])!=len(anchor['segments']):continue
+            if sorted(e['kind'] for e in path['segments'])!=sorted(e['kind'] for e in anchor['segments']):continue
             for rotation,translation,scale,angle in native_transforms(anchor,path,(.35,3.0) if reference.get('source_legend') or int(i) in legend_ids else (.80,1.25)):
                 box=bbox(reference_points@rotation.T+translation)
                 if not contains([0,0,*self.size],box,.01):continue
                 key=(*[round(v,2) for v in box],round(angle,1))
                 if key in seen:continue
                 seen.add(key)
-                if len(reference['paths'])==1:
+                if reference.get('core_fill'):
                     nearby=[path]
                 else:
                     nearby_ids=self.query(box,max(3,min(box[2:])*.1))
@@ -299,6 +328,23 @@ class NativeVectorPage:
                     colored=[p for p in nearby if chromatic(p)]
                     if colored:nearby=colored
                 evidence=generator.verify(reference,nearby,rotation,translation,box)
+                if not evidence['verified'] and len(nearby)>len(reference['paths']):
+                    connected=connected_geometry(reference,nearby,path)
+                    if len(connected)<len(nearby):
+                        alternative=generator.verify(reference,connected,rotation,translation,box)
+                        if alternative['verified']:
+                            evidence=alternative
+                            evidence['verification_method']='native_connected_geometry'
+                            evidence['ignored_background_paths']=len(nearby)-len(connected)
+                            nearby=connected
+                    if not evidence['verified'] and len(reference['paths'])>1:
+                        group=paint_group(reference,nearby,path)
+                        alternative=generator.verify(reference,group,rotation,translation,box)
+                        if alternative['verified']:
+                            evidence=alternative
+                            evidence['verification_method']='native_paint_group'
+                            evidence['ignored_background_paths']=len(nearby)-len(group)
+                            nearby=group
                 if evidence['verified']:
                     from .color_features import native_color_signature
                     hits.append({'rect':box,'score':evidence['graphic_score'],'rotation':angle,'scale':scale,
@@ -309,12 +355,24 @@ class NativeVectorPage:
         progress(100)
         return hits,{'indexed_paths':len(self.index),'decoded_paths':self.decoded,
                      'text_seeded_paths':len(seeded),'geometry_rejected':rejected,'index_bytes':self.index.nbytes,
-                     'truncated':self.truncated,'has_images':self.has_images,'index_cache_hit':self.index_cache_hit,
+                     'truncated':self.truncated,'has_images':self.has_images,'image_regions':self.image_regions,'index_cache_hit':self.index_cache_hit,
                      'limited_queries':self.limited_queries,'clipped_paths':len(self.clipped),
-                     'clipped_anchor_paths':clipped_relevant,'regions':regions}
+                     'clipped_anchor_paths':clipped_relevant,'regions':regions,'annotation_frames':reference_frames(self)}
 
 
 def native_transforms(anchor,path,scale_range=(.80,1.25)):
+    # A circular anchor has no privileged quarter-curve chord. PDF rounding
+    # can tilt that chord and shift the far end of an elongated device.
+    if all(len(p['segments'])==4 and all(e['kind']=='curve' for e in p['segments']) and
+           min(p['bbox'][2:])/max(p['bbox'][2:])>.94 for p in (anchor,path)):
+        aw,ah=anchor['bbox'][2:];bw,bh=path['bbox'][2:]
+        scale=(bw+bh)/(aw+ah)
+        if scale_range[0]<=scale<=scale_range[1]:
+            ac=np.array(anchor['bbox'][:2])+np.array([aw,ah])/2
+            bc=np.array(path['bbox'][:2])+np.array([bw,bh])/2
+            for angle in (0,90,180,270):
+                rad=math.radians(angle);rotation=np.array([[math.cos(rad),-math.sin(rad)],[math.sin(rad),math.cos(rad)]])*scale
+                yield rotation,bc-rotation@ac,float(scale),float(angle)
     # Longest edge avoids unstable rotations from sub-pixel short edges.
     line=max(anchor['segments'],key=lambda s:math.dist(s['points'][0],s['points'][-1]))
     p0,p1=np.array(line['points'])[[0,-1]];delta=p1-p0;length=np.linalg.norm(delta)
@@ -332,4 +390,84 @@ def native_transforms(anchor,path,scale_range=(.80,1.25)):
             # longer body. Thin-width error is normalized by its own dimension.
             expected=bbox(np.concatenate([sample_segment(s) for s in anchor['segments']])@rotation.T+translation)
             if any(abs(a-b)>max(.15,.08*max(a,b)) for a,b in zip(expected[2:],path['bbox'][2:])):continue
+            if any(abs(a-b)>max(.15,.02*max(path['bbox'][2:])) for a,b in zip(expected[:2],path['bbox'][:2])):continue
             yield rotation,translation,float(scale),math.degrees(angle)%360
+
+
+def connected_geometry(reference,paths,anchor):
+    """Separate complete connected symbols from contained, unrelated CAD clutter.
+
+    This only proposes a subset: full geometry and filled-area validation still
+    run afterwards. Endpoint attachment is required, not a crossing mid-line.
+    """
+    original_paths=paths
+    ref_colors={tuple(p.get('color',[])[:3]) for p in reference['paths']}
+    ref_widths=[p.get('stroke_width',0) for p in reference['paths'] if p.get('stroke')]
+    uniform=len(ref_colors)==1 and (not ref_widths or max(ref_widths)-min(ref_widths)<.02)
+    candidates=[]
+    for p in paths:
+        same_style=(p.get('color',[])[:3]==anchor.get('color',[])[:3] and
+            abs(p.get('stroke_width',0)-anchor.get('stroke_width',0))<max(.02,anchor.get('stroke_width',0)*.08))
+        if not uniform or same_style:candidates.append(p)
+    paths=without_paint_caps(candidates)
+    candidates=paths
+    if len(candidates)<=len(reference['paths']):return candidates
+    selected=[p for p in candidates if p is anchor or p.get('id')==anchor.get('id')]
+    if not selected:return paths
+    def near(points,edges):
+        for edge in edges:
+            samples=sample_segment(edge);a=samples[:-1];v=samples[1:]-a
+            delta=points[:,None,:]-a[None,:,:]
+            t=np.clip(np.sum(delta*v,axis=2)/np.maximum(np.sum(v*v,axis=1),1e-12),0,1)
+            if np.min(np.linalg.norm(delta-t[:,:,None]*v,axis=2))<=.18:return True
+        return False
+    # Traverse each path pair at most once. Rebuilding all selected edges at
+    # every iteration became quadratic work inside another quadratic loop on
+    # dense architectural hatching.
+    pending=[p for p in candidates if not any(p is q for q in selected)]
+    frontier=list(selected)
+    while frontier:
+        q=frontier.pop();qx,qy,qw,qh=q['bbox']
+        qends=np.asarray([pt for e in q['segments'] for pt in (e['points'][0],e['points'][-1])])
+        remaining=[]
+        for p in pending:
+            px,py,pw,ph=p['bbox']
+            if px>qx+qw+.18 or qx>px+pw+.18 or py>qy+qh+.18 or qy>py+ph+.18:
+                remaining.append(p);continue
+            pends=np.asarray([pt for e in p['segments'] for pt in (e['points'][0],e['points'][-1])])
+            if near(pends,q['segments']) or near(qends,p['segments']):selected.append(p);frontier.append(p)
+            else:remaining.append(p)
+        pending=remaining
+    # A later filled overprint of a matched circle/body cannot be hidden by
+    # the style grouping. Keep it so the fill gate sees the effective variant.
+    for p in without_paint_caps(original_paths):
+        if p.get('fill') and not any(p is q for q in selected) and any(max(abs(a-b) for a,b in zip(p['bbox'],q['bbox']))<.15 for q in selected):selected.append(p)
+    return deduplicate(selected)
+
+
+def paint_group(reference,paths,anchor):
+    """CAD entity command runs can separate touching architectural clutter.
+
+    Complete shape verification remains mandatory. Preserve simple closed areas
+    and connecting strokes even outside the run, so fill/inner-line variants
+    cannot disappear merely because their paint commands were emitted later.
+    """
+    paths=without_paint_caps(paths)
+    if 'id' not in anchor:return paths
+    source_ids=[p['id'] for p in reference['paths'] if 'id' in p]
+    window=max(16,(max(source_ids)-min(source_ids))*2) if source_ids else 64
+    group=[p for p in paths if abs(p.get('id',anchor['id'])-anchor['id'])<=window]
+    if not group:return paths
+    samples=[sample_segment(e) for p in group for e in p['segments']]
+    segments=np.concatenate([np.stack((a[:-1],a[1:]),axis=1) for a in samples])
+    def attached(point):
+        a=segments[:,0];v=segments[:,1]-a;delta=np.asarray(point)-a
+        t=np.clip(np.sum(delta*v,axis=1)/np.maximum(np.sum(v*v,axis=1),1e-12),0,1)
+        return np.min(np.linalg.norm(delta-t[:,None]*v,axis=1))<=.18
+    for p in paths:
+        if any(p is q for q in group):continue
+        es=p['segments']
+        closed=3<=len(es)<=8 and np.linalg.norm(np.array(es[0]['points'][0])-es[-1]['points'][-1])<.15
+        link=len(es)==1 and all(attached(pt) for pt in (es[0]['points'][0],es[0]['points'][-1]))
+        if closed or link:group.append(p)
+    return deduplicate(group)

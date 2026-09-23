@@ -34,20 +34,29 @@ def contour_evidence(reference,candidate):
     distances=[cv2.distanceTransform(1-m,cv2.DIST_L2,3) for m in masks]
     error=(float(distances[1][masks[0]>0].mean())+float(distances[0][masks[1]>0].mean()))/2
     reference_coverage=float(np.mean(distances[1][masks[0]>0]<=1.0))
-    structures=[]
+    structures=[];void_masks=[]
     for m in masks:
         contours,hierarchy=cv2.findContours(m,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
         significant=[i for i,c in enumerate(contours) if cv2.contourArea(c)>20]
         roots=sum(hierarchy[0][i][3]<0 for i in significant) if hierarchy is not None else 0
         holes=sum(hierarchy[0][i][3]>=0 for i in significant) if hierarchy is not None else 0
         structures.append((roots,holes))
+        voids=[]
+        for i in significant:
+            if hierarchy[0][i][3]<0:continue
+            hole=np.zeros_like(m);cv2.drawContours(hole,contours,i,1,-1)
+            hole=cv2.erode(hole,np.ones((5,5),np.uint8))
+            if hole.sum()>=20:voids.append(hole.astype(bool))
+        void_masks.append(voids)
     density=min(float(masks[0].sum()),float(masks[1].sum()))/max(float(masks[0].sum()),float(masks[1].sum()))
+    fill_consistent=not any(float(masks[1-side][hole].mean())>.85
+        for side in (0,1) for hole in void_masks[side])
     feature=density if structures[0]==structures[1] else density*.35
     geometry=math.exp(-error/2.0)
     return {"feature_score":feature,"geometry_score":geometry,
-            "verified":feature>=.78 and geometry>=.82,
-            "verification_reason":"contour_consistent" if feature>=.78 and geometry>=.82 else "contour_mismatch",
-            "reference_coverage":reference_coverage,"foreground_ratio":density,
+            "verified":feature>=.78 and geometry>=.82 and fill_consistent,
+            "verification_reason":"fill_variant_mismatch" if not fill_consistent else "contour_consistent" if feature>=.78 and geometry>=.82 else "contour_mismatch",
+            "reference_coverage":reference_coverage,"foreground_ratio":density,"fill_consistent":fill_consistent,
             "contours_reference":structures[0],"contours_candidate":structures[1],"chamfer_error":error}
 
 
@@ -100,7 +109,7 @@ class OpenCVFeatureMatcher:
         # A plan's wall/cable can cross an otherwise complete symbol. Permit extra
         # strokes only when the entire reference survives AND spatially distributed
         # RANSAC correspondences prove the same geometry. Missing strokes still fail.
-        extra_strokes=(contour.get("reference_coverage",0)>=.98 and contour.get("foreground_ratio",0)>=.88
+        extra_strokes=(contour.get("fill_consistent",True) and contour.get("reference_coverage",0)>=.98 and contour.get("foreground_ratio",0)>=.88
                        and contour["geometry_score"]>=.88 and geometric.get("inliers",0)>=20
                        and geometric.get("inlier_coverage",0)>=.35 and geometric["geometry_score"]>=.90)
         structure_ok=contour["verified"] or extra_strokes

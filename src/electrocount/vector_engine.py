@@ -105,7 +105,36 @@ def intersections(segments):
     return count
 
 
+def without_paint_caps(paths):
+    """CAD round line joins may be emitted as separate filled disks.
+
+    Remove only small disks centered on another path's segment endpoint.
+    An isolated sensor dot or a filled central body remains semantic geometry.
+    """
+    if not paths:return paths
+    bounds=bbox([v for p in paths for s in p['segments'] for v in s['points']])
+    limit=min(bounds[2:])*.18
+    kept=[]
+    for p in paths:
+        x,y,w,h=p['bbox']
+        disk=(p.get('fill') and len(p['segments'])==4 and
+              all(s['kind']=='curve' for s in p['segments']) and
+              0<max(w,h)<=limit and min(w,h)/max(w,h)>.85)
+        center=np.array([x+w/2,y+h/2])
+        attached=disk and any(np.linalg.norm(np.array(pt)-center)<=max(w,h)*.3
+            for other in paths if other is not p and max(other['bbox'][2:])>max(w,h)*3
+            for seg in other['segments'] for pt in (seg['points'][0],seg['points'][-1]))
+        if not attached:kept.append(p)
+    return kept
+
+
+def painted_fill(path):
+    color=path.get('color')
+    return bool(path.get('fill')) and not (color and min(color[:3])>=245)
+
+
 def signature(paths):
+    paths=without_paint_caps(paths)
     segments=[s for p in paths for s in p["segments"]]
     if len(segments)<3 or len(segments)>512:
         return None
@@ -174,6 +203,18 @@ class VectorCandidateGenerator:
 
     def verify(self,reference,nearby,rotation,translation,box):
         from collections import Counter
+        nearby=without_paint_caps(nearby)
+        # CAD backgrounds can leave a tiny spur inside an otherwise complete
+        # device. The budget is geometric length, never a percentage of paths;
+        # filled areas and missing reference features cannot use this tolerance.
+        ref_edges=[e for p in reference['paths'] for e in p['segments']]
+        budget=.012*sum(np.linalg.norm(np.diff(sample_segment(e)@rotation.T,axis=0),axis=1).sum() for e in ref_edges)
+        excess=sum(len(p['segments']) for p in nearby)-len(ref_edges)
+        if excess>0:
+            tiny=sorted((float(np.linalg.norm(np.diff(sample_segment(p['segments'][0]),axis=0),axis=1).sum()),i)
+                for i,p in enumerate(nearby) if len(p['segments'])==1 and p['segments'][0]['kind']=='line' and not p.get('fill'))
+            if len(tiny)>=excess and sum(length for length,_ in tiny[:excess])<=budget:
+                discard={i for _,i in tiny[:excess]};nearby=[p for i,p in enumerate(nearby) if i not in discard]
         ref=[s for p in reference["paths"] for s in p["segments"]]
         actual=[s for p in nearby for s in p["segments"]]
         ratio=min(len(ref),len(actual))/max(len(ref),len(actual),1)
@@ -193,17 +234,32 @@ class VectorCandidateGenerator:
             reverse=np.linalg.norm(samples[:,::-1]-a,axis=2).mean(axis=1)
             distances=np.minimum(forward,reverse)/diagonal
             costs.extend((float(distances[j]),i,j) for j in range(len(actual)) if ref[i]["kind"]==actual[j]["kind"])
-        used_ref=set();used_actual=set();errors=[]
+        used_ref=set();used_actual=set();errors=[];fill_mismatch=False
         for error,i,j in sorted(costs):
             if i not in used_ref and j not in used_actual:
                 used_ref.add(i);used_actual.add(j);errors.append(error)
-        geometry=math.exp(-25*max(errors,default=1))
+
+        # Paint is a property of closed areas, not matched boundary edges.
+        # A stroked edge and a fill boundary can coincide in either PDF order.
+        filled_ref=[p for p in reference['paths'] if painted_fill(p)]
+        filled_actual=[p for p in nearby if painted_fill(p)]
+        fill_mismatch=len(filled_ref)!=len(filled_actual)
+        unused=set(range(len(filled_actual)))
+        for p in filled_ref:
+            expected_box=bbox(np.concatenate([sample_segment(e) for e in p['segments']])@rotation.T+translation)
+            compatible=[j for j in unused if max(abs(a-b) for a,b in zip(expected_box,filled_actual[j]['bbox']))<=max(.20,diagonal*.012)]
+            if not compatible:fill_mismatch=True;break
+            unused.remove(min(compatible,key=lambda j:sum(abs(a-b) for a,b in zip(expected_box,filled_actual[j]['bbox']))))
+        # CAD coordinates are often rounded to 0.12 pt. Allow that absolute
+        # quantization, while preserving the relative full-shape gate.
+        residual=max(0.,max(errors,default=1)-.12/diagonal)
+        geometry=math.exp(-25*residual)
         consistent=geometry>=.88 and intersections(actual)==reference["intersections"]
         feature=ratio*(1.0 if kinds else .4)*(1.0 if consistent else .4)
-        verified=feature>=.95 and geometry>=.88 and len(used_ref)==len(ref)
+        verified=feature>=.95 and geometry>=.88 and len(used_ref)==len(ref) and not fill_mismatch
         return {"graphic_score":(feature+geometry)/2,"feature_score":feature,"geometry_score":geometry,
                 "template_score":None,"verified":verified,"verification_method":"vector_signature",
-                "verification_reason":"verified_structure" if verified else "structural_mismatch",
+                "verification_reason":"fill_variant_mismatch" if fill_mismatch else "verified_structure" if verified else "structural_mismatch",
                 "inliers":len([e for e in errors if e<.02]),"feature_matches":len(errors),
                 "transform":[*rotation.tolist()[0],translation[0],*rotation.tolist()[1],translation[1]]}
 

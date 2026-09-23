@@ -252,7 +252,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.pages.itemDoubleClicked.connect(self.rename_page)
         self.pages.verticalScrollBar().valueChanged.connect(lambda _: self.load_thumbnails())
         layout.addWidget(self.pages)
-        note = QLabel("Lokalnie · bez chmury\nWersja 0.5 · lokalna analiza PDF")
+        note = QLabel(f"Lokalnie · bez chmury\nWersja {__version__} · lokalna analiza PDF")
         note.setStyleSheet("color: #8096ad; padding: 12px;")
         layout.addWidget(note)
         self.pages_sidebar = CollapsiblePanel("Strony",left,190,260)
@@ -512,7 +512,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.capture_view()
         if old_view != self.project.view:
             self.dirty = True
-            self.setWindowTitle(f"ElectroCount 0.5 · {self.project.name} *")
+            self.setWindowTitle(f"ElectroCount {__version__} · {self.project.name} *")
         scale = min(4.0, max(1.0, round(self.view.transform().m11()*2)/2))
         rect = self.view.mapToScene(self.view.viewport().rect()).boundingRect().intersected(self.view.page_rect)
         if rect.isEmpty():
@@ -963,7 +963,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             others = Counter(d["label"] for d in self.project.discoveries if d["requested_group"] == group.id)
             other_text = ", ".join(f"{code}: {number}" for code, number in others.items()) or "brak"
             legend=sum(r.get("counts",{}).get("legend_matches",0) for key,r in self.project.analysis_reports.items() if key.startswith(group.id+":"))
-            self.summary.setText(f"Znaleziono {accepted+review+conflict} · {legend} w legendzie (nie doliczono)\n{group.name} · oznaczenie: {group.label or ('możliwe '+group.possible_label if group.possible_label else 'brak — wzorzec graficzny')}\n{accepted} zatwierdzonych · {review} do sprawdzenia · {conflict} w konflikcie\nBez przypisania: {pending}\nInne oznaczenia: {other_text}")
+            self.summary.setText(f"Znaleziono {accepted+review+conflict} · {legend} w legendzie / uwagach (nie doliczono)\n{group.name} · oznaczenie: {group.label or ('możliwe '+group.possible_label if group.possible_label else 'brak — wzorzec graficzny')}\n{accepted} zatwierdzonych · {review} do sprawdzenia · {conflict} w konflikcie\nBez przypisania: {pending}\nInne oznaczenia: {other_text}")
         else:
             self.summary.setText("Zaznacz wzorzec z oznaczeniem lub utwórz grupę.")
         self.view.draw_detections(self.project, self.conflict_ids, self.selected, self.review_only.isChecked())

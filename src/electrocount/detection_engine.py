@@ -20,7 +20,7 @@ class DetectionEngine:
     def find(self,path,page,template,label="",threshold=.82,progress=lambda p:None,template_path=None,status=lambda text:None):
         status("Odczyt tekstu i przygotowanie wzorca")
         source=template_path or path
-        if not template.get("text_aware") or (template.get("definition_version",0)<5 and
+        if not template.get("text_aware") or (template.get("definition_version",0)<6 and
                 template.get("selection_rect") and hasattr(self.pdf,"open_vector_page")):
             template=prepare_template(self.pdf,source,template["page"],template.get("selection_rect",template["rect"]))
         expected=normalize_text(label or template.get("label",""))
@@ -60,9 +60,12 @@ class DetectionEngine:
         if use_raster:
             status("Wyszukiwanie podobnych kształtów w kafelkach")
             try:
+                raster_options={}
+                if not self.custom_matcher and native_stats and vectors['unsupported']==0:
+                    raster_options['search_regions']=native_stats.get('image_regions')
                 proposals.extend(self.matcher.find(self.pdf,path,page,template,threshold,
                     lambda p:progress(30+round(p*.20)),text_items=items,
-                    template_items=template_items,template_path=source))
+                    template_items=template_items,template_path=source,**raster_options))
             except ValueError as exc:
                 if not native_stats or not proposals:raise
                 warnings.append("Analiza obrazu niepełna: "+str(exc))
@@ -212,14 +215,21 @@ class DetectionEngine:
                 hit['reason']=association['reason'] if association['reason']=='shared_label' else decision_reason
                 result['review'].append(hit)
         from .document_regions import region_for
-        regions=native_stats.get('regions',[])
+        regions=list(native_stats.get('regions',[]))
+        if native_stats.get('annotation_frames'):
+            from .document_regions import confirmed_reference_panels
+            status('Sprawdzanie legend i przykładów w uwagach')
+            try:
+                regions.extend(confirmed_reference_panels(self.pdf,path,page,items,native_stats['annotation_frames'],result['matches']))
+            except (RuntimeError,ImportError,OSError) as exc:
+                warnings.append('Nie udało się sprawdzić opisów ramek z uwagami: '+str(exc))
         result['legend_matches']=[]
         countable=[]
         for hit in result['matches']:
             region=region_for(hit['rect'],regions)
             is_source=template.get('source')=='LEGEND' and source==path and page==template['page'] and overlap_metrics(hit['rect'],template['rect'])[0]>.5
             if region or is_source:
-                result['legend_matches'].append({**hit,'status':'SOURCE_TEMPLATE' if is_source else 'LEGEND_REFERENCE','reason':'legend_reference','region':region['rect'] if region else template['rect']})
+                result['legend_matches'].append({**hit,'status':'SOURCE_TEMPLATE' if is_source else 'LEGEND_REFERENCE','reason':'annotation_reference' if region and region.get('kind')=='reference_panel' else 'legend_reference','region':region['rect'] if region else template['rect']})
             else:countable.append(hit)
         result['matches']=countable
         result['counts']={'raw_matches':len(countable)+len(result['legend_matches']),

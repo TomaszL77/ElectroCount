@@ -71,7 +71,7 @@ class TemplateMatcher:
     ANGLES=(-8.0,0.0,8.0,90.0,180.0,270.0)
 
     def find(self,engine,path,page,template,threshold,progress=lambda p:None,
-             text_items=None,template_items=None,template_path=None):
+             text_items=None,template_items=None,template_path=None,search_regions=None):
         scale=self.SCALE;box=template.get("raster_rect",template["rect"])
         if min(box[2:])<3 or max(box[2:])>256:
             raise ValueError("Wzorzec musi mieć 3–256 punktów na bok.")
@@ -85,34 +85,40 @@ class TemplateMatcher:
         meta=engine.inspect(path)[page]
         pw,ph=meta["width"],meta["height"]
         step_x,step_y=(self.TILE-max_w)/scale,(self.TILE-max_h)/scale
-        cols,rows=math.ceil(pw/step_x),math.ceil(ph/step_y)
+        tiles=[]
+        for rx,ry,rw,rh in (search_regions if search_regions is not None else [[0,0,pw,ph]]):
+            pad=max(max_w,max_h)/scale
+            left,top=max(0,rx-pad),max(0,ry-pad)
+            right,bottom=min(pw,rx+rw+pad),min(ph,ry+rh+pad)
+            for row in range(max(0,math.ceil((bottom-top)/step_y))):
+                for col in range(max(0,math.ceil((right-left)/step_x))):
+                    x,y=left+col*step_x,top+row*step_y
+                    tiles.append([x,y,min(self.TILE/scale,right-x),min(self.TILE/scale,bottom-y)])
         candidates=[]
-        for row in range(rows):
-            for col in range(cols):
-                x,y=col*step_x,row*step_y
-                rect=[x,y,min(self.TILE/scale,pw-x),min(self.TILE/scale,ph-y)]
-                image=engine.render(path,page,scale,rect)
-                image=cv2.cvtColor(mask_text(image,text_items or [],rect,scale),cv2.COLOR_RGB2GRAY)
-                for size,angle,pattern in variants:
-                    th,tw=pattern.shape
-                    if image.shape[0]<th or image.shape[1]<tw:
-                        continue
-                    scores=cv2.matchTemplate(image,pattern,cv2.TM_CCOEFF_NORMED)
-                    maxima=cv2.dilate(scores,np.ones((3,3),np.uint8))
-                    ys,xs=np.where((scores>=threshold)&(scores>=maxima))
-                    if len(xs)+len(candidates)>30000:
-                        raise ValueError("Zbyt wiele kandydatów. Wybierz bardziej charakterystyczny wzorzec.")
-                    for yy,xx in zip(ys,xs):
-                        patch=[x+float(xx)/scale,y+float(yy)/scale,tw/scale,th/scale]
-                        core=patch
-                        if box!=template["rect"]:
-                            cw,ch=template["rect"][2:];a=math.radians(angle)
-                            cw,ch=size*(abs(math.cos(a))*cw+abs(math.sin(a))*ch),size*(abs(math.sin(a))*cw+abs(math.cos(a))*ch)
-                            core=[patch[0]+(patch[2]-cw)/2,patch[1]+(patch[3]-ch)/2,cw,ch]
-                        candidates.append({"rect":core,"verification_rect":patch,
-                            "score":float(scores[yy,xx]),"template_score":float(scores[yy,xx]),
-                            "scale":size,"rotation":-angle,"raster_angle":angle,"source":"raster"})
-                progress(round((row*cols+col+1)*100/(rows*cols)))
+        for tile_index,rect in enumerate(tiles):
+            x,y=rect[:2]
+            image=engine.render(path,page,scale,rect)
+            image=cv2.cvtColor(mask_text(image,text_items or [],rect,scale),cv2.COLOR_RGB2GRAY)
+            for size,angle,pattern in variants:
+                th,tw=pattern.shape
+                if image.shape[0]<th or image.shape[1]<tw:
+                    continue
+                scores=cv2.matchTemplate(image,pattern,cv2.TM_CCOEFF_NORMED)
+                maxima=cv2.dilate(scores,np.ones((3,3),np.uint8))
+                ys,xs=np.where((scores>=threshold)&(scores>=maxima))
+                if len(xs)+len(candidates)>30000:
+                    raise ValueError("Zbyt wiele kandydatów. Wybierz bardziej charakterystyczny wzorzec.")
+                for yy,xx in zip(ys,xs):
+                    patch=[x+float(xx)/scale,y+float(yy)/scale,tw/scale,th/scale]
+                    core=patch
+                    if box!=template["rect"]:
+                        cw,ch=template["rect"][2:];a=math.radians(angle)
+                        cw,ch=size*(abs(math.cos(a))*cw+abs(math.sin(a))*ch),size*(abs(math.sin(a))*cw+abs(math.cos(a))*ch)
+                        core=[patch[0]+(patch[2]-cw)/2,patch[1]+(patch[3]-ch)/2,cw,ch]
+                    candidates.append({"rect":core,"verification_rect":patch,
+                        "score":float(scores[yy,xx]),"template_score":float(scores[yy,xx]),
+                        "scale":size,"rotation":-angle,"raster_angle":angle,"source":"raster"})
+            progress(round((tile_index+1)*100/max(1,len(tiles))))
         kept=[]
         for candidate in sorted(candidates,key=lambda c:c["score"],reverse=True):
             # Keep alternative scales/orientations until the geometry gate.

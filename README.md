@@ -1,4 +1,4 @@
-# ElectroCount 0.7 — wyszukiwanie wskazanego wzorca
+# ElectroCount 0.7.1 — wyszukiwanie wskazanego wzorca
 
 Lokalna aplikacja Windows do zliczania konkretnego symbolu wybranego na rzucie albo w legendzie. Wzorzec łączy geometrię, kolor, oznaczenie i jego otoczenie. Program nie klasyfikuje automatycznie wszystkich instalacji.
 
@@ -6,7 +6,9 @@ Lokalna aplikacja Windows do zliczania konkretnego symbolu wybranego na rzucie a
 
 Python 3.12 64-bit → **Instaluj.cmd** → **Uruchom.cmd**. Instalator pobiera przypięte biblioteki i lokalny model DINOv2-small (89 MB), sprawdza SHA-256, uruchamia test modeli i test kontrolny 12/12. Runtime znajduje się w `%LOCALAPPDATA%/ElectroCount/py312-07`. Inference działa bez internetu. Na drugim komputerze wykonaj osobną instalację; nie kopiuj `.runtime-path` ani środowiska Python.
 
-[Instrukcja pracy na dwóch komputerach](START-TUTAJ.md) · [Stan prac](CONTINUE.md) · [Zmiany i ograniczenia 0.7](docs/one-shot-07.md)
+[Instrukcja pracy na dwóch komputerach](START-TUTAJ.md) · [Stan prac](CONTINUE.md) · [Trudne symbole CAD — 0.7.1](docs/cpp203-071.md) · [Architektura 0.7](docs/one-shot-07.md)
+
+Wersja 0.7.1 rozróżnia puste i wypełnione środki symboli, lepiej oddziela oprawę od przewodów i tła oraz wyłącza przykłady z legend i rozpoznanych ramek uwag. Na CPP-TD-CR-EB-203 aplikacja wykrywa 113 L1 i 76 L1-1. Są to wyniki detektora, wymagające weryfikacji; nie stanowią potwierdzenia kompletnej liczby opraw.
 
 ## Jak zliczać
 

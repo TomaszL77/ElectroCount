@@ -1,3 +1,13 @@
+# Weryfikacja 0.7.1 — 23.09.2026
+
+Końcowa pełna seria: **144 zaliczone, 0 błędów, 0 pominiętych**, 654,39 s. Ustawiono ELECTROCOUNT_TEST_HALA, ELECTROCOUNT_TEST_PACK oraz ELECTROCOUNT_TEST_CPP203. Po tej serii kod src nie był zmieniany.
+
+Osobne GUI Qt przy 125%: otwarcie CPP203, wybór L1 myszą z legendy, wyszukiwanie, 113 unikalnych pozycji i 4 wyłączone ilustracje, poprawna grupa, zapis i odczyt projektu. Hash GUI i serwisu: `7d15e30c4c238b67210da6dc5db12f8ae6c613e88a99cb20f5f08d48e9043b33`; brak błędów. Końcowy benchmark pary: L1=113, L1-1=76, brak wspólnych lokalizacji. Są to ilości wykryć, nie pełna niezależna anotacja strony.
+
+Lokalne dowody: work/cpp203/regression-071-final.xml, work/cpp203/gui-L1-final/gui-report.json oraz work/cpp203/final-benchmark/report.json. Nie są publikowane z prywatnym PDF. Zakres i ograniczenia: [cpp203-071.md](cpp203-071.md). Nie testowano na drugim fizycznym komputerze.
+
+Poniżej raporty historyczne.
+
 # Weryfikacja 0.7 — 22.09.2026
 
 Pełna seria z rzeczywistą halą i pakietem PDF: **131 zaliczonych, 0 błędów**, 624.96 s. Po ostatnich poprawkach wykonano dodatkową serię obejmującą zmienione obszary: **82 zaliczone, 1 pominięty**, 56 s. Pominięcie dotyczyło testu hali bez zmiennej środowiskowej w tej dodatkowej serii; hala została sprawdzona w pełnej serii i osobnym teście GUI. Liczby obejmują powtórzenia tych samych testów, nie sumują się do liczby unikalnych przypadków.

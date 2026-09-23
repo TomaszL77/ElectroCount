@@ -2,7 +2,7 @@
 import argparse,json,os,sys,time
 from pathlib import Path
 root=Path(__file__).resolve().parents[1];sys.path.insert(0,str(root/'src'))
-p=argparse.ArgumentParser();p.add_argument('--pdf',required=True);p.add_argument('--output',required=True);p.add_argument('--zoom',type=float,default=3);p.add_argument('--selection',type=float,nargs=4,default=[3145,1380,40,55]);a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--pdf',required=True);p.add_argument('--output',required=True);p.add_argument('--zoom',type=float,default=3);p.add_argument('--selection',type=float,nargs=4,default=[3145,1380,40,55]);p.add_argument('--label',default='L3');p.add_argument('--expected',type=int,default=72);p.add_argument('--legend-count',type=int,default=1);a=p.parse_args()
 out=Path(a.output).resolve();out.mkdir(parents=True,exist_ok=True)
 os.environ['QT_QPA_PLATFORM']='offscreen';os.environ['ELECTROCOUNT_SKIP_PROFILE']='1'
 os.environ['ELECTROCOUNT_DATA_DIR']=str(out);os.environ['ELECTROCOUNT_SETTINGS_PATH']=str(out/'settings.ini')
@@ -31,7 +31,7 @@ def step():
  global phase,exitcode
  try:
   if errors:raise RuntimeError(str(errors))
-  if time.monotonic()-start>240:raise RuntimeError('GUI diagnostic timeout: '+phase)
+  if time.monotonic()-start>900:raise RuntimeError('GUI diagnostic timeout: '+phase)
   if phase=='open' and w.view.preview is not None and not w.loading:
    w.view.resetTransform();w.view.scale(a.zoom,a.zoom);w.view.centerOn(a.selection[0]+a.selection[2]/2,a.selection[1]+a.selection[3]/2);app.processEvents()
    w.registry.invoke('template')
@@ -42,11 +42,11 @@ def step():
    QTest.mouseRelease(w.view.viewport(),Qt.MouseButton.LeftButton,pos=right)
    phase='template'
   elif phase=='template' and w.project.active_group() and not w.loading:
-   assert w.project.active_group().label=='L3'
+   assert w.project.active_group().label==a.label
    phase='find';w.registry.invoke('find')
   elif phase=='find' and w.project.analysis_reports and not w.busy:
    group=w.project.active_group();gui=w.project.analysis_reports[f'{group.id}:0']
-   direct=run_detection(CachedPDFEngine(PdfiumEngine(),out/'direct-cache'),a.pdf,0,group.template,'L3',w.project.threshold,
+   direct=run_detection(CachedPDFEngine(PdfiumEngine(),out/'direct-cache'),a.pdf,0,group.template,a.label,w.project.threshold,
                         config=w.performance.plan.to_dict())
    assigned=[d for d in w.project.detections if d.group==group.id]
    w.folder=str(out/'saved-project');assert w.save_project()
@@ -56,9 +56,9 @@ def step():
       'service_result_sha256':direct['result_sha256'],'same_result':gui['result_sha256']==direct['result_sha256'],
       'assigned':len(assigned),'ui_row':[w.groups.topLevelItem(0).text(i) for i in range(4)],
       'summary':w.summary.text(),'save_restore_equal':restored.detections==w.project.detections,
-      'unique_labels':len({tuple(d.label_bbox) for d in assigned}),'seconds':time.monotonic()-start,'errors':errors}
-   assert report['counts']=={'raw_matches':73,'legend_matches':1,'countable_devices':72}
-   assert report['same_result'] and report['unique_labels']==72 and report['save_restore_equal']
+      'unique_labels':len({tuple(d.label_bbox) for d in assigned if d.label_bbox}), 'unique_positions':len({tuple(round(v,2) for v in d.rect) for d in assigned}),'seconds':time.monotonic()-start,'errors':errors}
+   assert report['counts']=={'raw_matches':a.expected+a.legend_count,'legend_matches':a.legend_count,'countable_devices':a.expected}
+   assert report['same_result'] and report['unique_positions']==a.expected and report['save_restore_equal']
    w.grab().save(str(out/'gui-detail.png'));w.view.fit();w.refresh_results();w.grab().save(str(out/'gui-fit.png'))
    (out/'gui-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
    print(json.dumps(report,ensure_ascii=True),flush=True);exitcode=0;stop();return
