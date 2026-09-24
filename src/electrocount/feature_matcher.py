@@ -85,6 +85,44 @@ def geometric_verification(points0,points1,shape):
 
 
 class OpenCVFeatureMatcher:
+    def verify_with_context(self, reference, candidate, context, padding):
+        """Recover only complete symbols crossed by an externally proven line.
+
+        An extra internal line is a device variant. A background line must
+        continue through both margins outside the candidate, and account for
+        every substantial extra foreground pixel. Re-run the strict verifier
+        after removing only excess pixels, preserving all reference strokes.
+        """
+        evidence=self.verify(reference,candidate)
+        if evidence['verified'] or not evidence.get('fill_consistent',True):return evidence
+        if evidence.get('reference_coverage',0)<.99:return evidence
+        a,b,outer=gray(reference),gray(candidate),gray(context)
+        h,w=b.shape
+        if a.shape!=b.shape or outer.shape!=(h+2*padding,w+2*padding):return evidence
+        expected=a<190;actual=b<190;ink=outer<190
+        protected=cv2.dilate(expected.astype(np.uint8),np.ones((3,3),np.uint8))>0
+        extra=actual & ~protected
+        if not extra.any():return evidence
+        vertical=(ink[:padding,padding:padding+w].mean(axis=0)>=.75)&(ink[-padding:,padding:padding+w].mean(axis=0)>=.75)&(actual.mean(axis=0)>=.9)
+        horizontal=(ink[padding:padding+h,:padding].mean(axis=1)>=.75)&(ink[padding:padding+h,-padding:].mean(axis=1)>=.75)&(actual.mean(axis=1)>=.9)
+        # Thick bands/filled areas are never treated as cable/wall strokes.
+        def thin_runs(values):
+            result=np.zeros_like(values)
+            edges=np.diff(np.r_[False,values,False].astype(int))
+            for start,end in zip(np.flatnonzero(edges==1),np.flatnonzero(edges==-1)):
+                if end-start<=max(1,min(h,w)*.15):result[start:end]=True
+            return result
+        stripes=np.broadcast_to(thin_runs(vertical),(h,w)) | np.broadcast_to(thin_runs(horizontal)[:,None],(h,w))
+        stripes=cv2.dilate(stripes.astype(np.uint8),np.ones((3,3),np.uint8))>0
+        if not np.all(stripes[extra]):return evidence
+        cleaned=candidate.copy();cleaned[stripes & ~protected]=255
+        recovered=self.verify(reference,cleaned)
+        if recovered['verified']:
+            recovered.update(verification_method='context_verified_crossing',
+                             verification_reason='complete_symbol_with_external_crossing')
+            return recovered
+        return evidence
+
     def verify(self,reference,candidate):
         a,b=fit_image(reference),fit_image(candidate)
         if a.shape!=b.shape:
@@ -106,15 +144,10 @@ class OpenCVFeatureMatcher:
                     "feature_matches":len(matches)}
         geometric=geometric_verification([k0[m.queryIdx].pt for m in matches],
                                           [k1[m.trainIdx].pt for m in matches],a.shape)
-        # A plan's wall/cable can cross an otherwise complete symbol. Permit extra
-        # strokes only when the entire reference survives AND spatially distributed
-        # RANSAC correspondences prove the same geometry. Missing strokes still fail.
-        extra_strokes=(contour.get("fill_consistent",True) and contour.get("reference_coverage",0)>=.98 and contour.get("foreground_ratio",0)>=.88
-                       and contour["geometry_score"]>=.88 and geometric.get("inliers",0)>=20
-                       and geometric.get("inlier_coverage",0)>=.35 and geometric["geometry_score"]>=.90)
-        structure_ok=contour["verified"] or extra_strokes
-        reason=("reference_geometry_with_extra_strokes" if extra_strokes and not contour["verified"]
-                else contour["verification_reason"])
+        # ORB agreement alone cannot distinguish an extra device feature from
+        # a wall. Background recovery requires the surrounding crop below.
+        structure_ok=contour["verified"]
+        reason=contour["verification_reason"]
         return {**contour,**geometric,"feature_score":min(1,len(matches)/max(12,min(len(k0),len(k1))*.35)),
                 "verified":geometric["verified"] and structure_ok,
                 "verification_reason":geometric["verification_reason"] if not geometric["verified"] else reason,
@@ -151,4 +184,3 @@ class LightGlueFeatureMatcher(LearnedFeatureMatcher):
                     return (f0["keypoints"][0][matches[:,0]].cpu().numpy(),
                             f1["keypoints"][0][matches[:,1]].cpu().numpy())
         super().__init__(Backend())
-

@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import numpy as np
 import pypdfium2 as pdfium
-from .vector_engine import bbox, contains, signature, sample_segment, VectorCandidateGenerator, without_paint_caps, painted_fill
+from .vector_engine import bbox, contains, signature, sample_segment, VectorCandidateGenerator, without_paint_caps, painted_fill, canonical_path
 
 
 def _style(obj):
@@ -53,7 +53,7 @@ def _decode(obj, converter):
             if math.dist(previous,start)>.001: segments.append({"kind":"line","points":[previous,start]})
             previous=start
     if not segments: return None
-    return {"bbox":bbox([pt for s in segments for pt in s["points"]]),"segments":segments,**_style(obj)}
+    return canonical_path({"bbox":bbox([pt for s in segments for pt in s["points"]]),"segments":segments,**_style(obj)})
 
 
 def _clip_preserves_geometry(obj,value,converter):

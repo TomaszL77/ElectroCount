@@ -133,8 +133,36 @@ def painted_fill(path):
     return bool(path.get('fill')) and not (color and min(color[:3])>=245)
 
 
+def canonical_path(path):
+    """Join contiguous straight subdivisions within one painted PDF path.
+
+    Never join separate objects, gaps, reversals or curves. The 0.001 pt
+    tolerance covers coordinate conversion rounding, not missing features.
+    Preserve paint, bounds and every non-collinear device detail.
+    """
+    def join(a, b):
+        if a['kind'] != 'line' or b['kind'] != 'line': return None
+        start, end = a['points']; other, final = b['points']
+        if math.dist(end, other) > .001: return None
+        ux, uy = end[0]-start[0], end[1]-start[1]
+        vx, vy = final[0]-other[0], final[1]-other[1]
+        length = math.hypot(ux, uy)
+        if length <= .001 or ux*vx+uy*vy <= 0: return None
+        if abs(ux*vy-uy*vx)/length > .001: return None
+        return {'kind':'line', 'points':[start, final]}
+    segments=[]
+    for segment in path['segments']:
+        merged=join(segments[-1], segment) if segments else None
+        if merged: segments[-1]=merged
+        else: segments.append(segment)
+    if len(segments)>1:
+        merged=join(segments[-1], segments[0])
+        if merged: segments=[merged, *segments[1:-1]]
+    return {**path, 'segments':segments}
+
+
 def signature(paths):
-    paths=without_paint_caps(paths)
+    paths=without_paint_caps([canonical_path(p) for p in paths])
     segments=[s for p in paths for s in p["segments"]]
     if len(segments)<3 or len(segments)>512:
         return None
@@ -168,7 +196,8 @@ class VectorCandidateGenerator:
         reference_points=np.concatenate([sample_segment(s) for s in segments])
         candidates=[]
         total=max(1,len(data["paths"]))
-        for index,path in enumerate(data["paths"]):
+        canonical=[canonical_path(p) for p in data['paths']]
+        for index,path in enumerate(canonical):
             if len(path["segments"])!=len(anchor["segments"]):
                 continue
             for edge in path["segments"]:
@@ -186,7 +215,7 @@ class VectorCandidateGenerator:
                     translation=q0-rotation@p0
                     expected=reference_points@rotation.T+translation
                     box=bbox(expected)
-                    nearby=[p for p in data["paths"] if contains(box,p["bbox"],max(1.0,min(box[2:])*.06))]
+                    nearby=[p for p in canonical if contains(box,p["bbox"],max(1.0,min(box[2:])*.06))]
                     verified=self.verify(reference,nearby,rotation,translation,box)
                     candidates.append({"rect":box,"score":verified["graphic_score"],"rotation":math.degrees(angle),"scale":scale,
                                        "source":"vector",**verified})
@@ -203,7 +232,7 @@ class VectorCandidateGenerator:
 
     def verify(self,reference,nearby,rotation,translation,box):
         from collections import Counter
-        nearby=without_paint_caps(nearby)
+        nearby=without_paint_caps([canonical_path(p) for p in nearby])
         # CAD backgrounds can leave a tiny spur inside an otherwise complete
         # device. The budget is geometric length, never a percentage of paths;
         # filled areas and missing reference features cannot use this tolerance.
@@ -262,4 +291,3 @@ class VectorCandidateGenerator:
                 "verification_reason":"fill_variant_mismatch" if fill_mismatch else "verified_structure" if verified else "structural_mismatch",
                 "inliers":len([e for e in errors if e<.02]),"feature_matches":len(errors),
                 "transform":[*rotation.tolist()[0],translation[0],*rotation.tolist()[1],translation[1]]}
-

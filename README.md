@@ -1,6 +1,8 @@
-# ElectroCount 0.7.1 — wyszukiwanie wskazanego wzorca
+# ElectroCount 0.7.2 — wyszukiwanie wskazanego wzorca
 
 Lokalna aplikacja Windows do zliczania konkretnego symbolu wybranego na rzucie albo w legendzie. Wzorzec łączy geometrię, kolor, oznaczenie i jego otoczenie. Program nie klasyfikuje automatycznie wszystkich instalacji.
+
+0.7.2 poprawia zgodność symboli z podzielonymi odcinkami w PDF oraz analizę obrazową symboli przeciętych linią biegnącą poza wzorcem. Panel pokazuje wyraźny licznik znalezionych i filtr aktywnej grupy. [Zmiany i zakres testów](docs/detection-072.md).
 
 ## Uruchomienie
 

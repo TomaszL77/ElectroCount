@@ -87,7 +87,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.register_commands()
         self.build_ui()
         self.init_import_ui()
-        self.view.viewport_changed.connect(lambda:self.view.draw_detections(self.project,self.conflict_ids,self.selected,self.review_only.isChecked()))
+        self.view.viewport_changed.connect(lambda:self.view.draw_detections(self.project,self.conflict_ids,self.selected,self.review_only.isChecked(),self.active_group_only.isChecked()))
         self.refresh()
         self.performance = PerformanceController(self.settings_store,self)
         self.performance.changed.connect(self.update_performance)
@@ -270,11 +270,14 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         label.setObjectName("section")
         layout.addWidget(label)
         self.groups = QTreeWidget()
-        self.groups.setHeaderLabels(["Grupa", "OK", "Sprawdź", "Konflikt"])
+        self.groups.setHeaderLabels(["Grupa", "Znaleziono", "OK", "Sprawdź", "Konflikt"])
         self.groups.setRootIsDecorated(False)
-        self.groups.setColumnWidth(0, 140)
-        for col in (1, 2, 3):
+        self.groups.setColumnWidth(0, 80)
+        for col in (1, 2, 3, 4):
             self.groups.setColumnWidth(col, 55)
+        self.groups.setColumnWidth(1, 85)
+        self.groups.setColumnWidth(2, 35)
+        self.groups.setColumnWidth(3, 65)
         self.groups.currentItemChanged.connect(self.activate_group)
         self.groups.itemChanged.connect(self.group_changed)
         self.groups.itemDoubleClicked.connect(self.edit_group)
@@ -300,6 +303,14 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.review_only = QCheckBox("Tylko do weryfikacji i konflikty")
         self.review_only.toggled.connect(lambda _: self.refresh_results())
         layout.addWidget(self.review_only)
+        self.active_group_only = QCheckBox("Na rysunku tylko aktywna grupa")
+        self.active_group_only.setChecked(self.settings_store.get("view/active_group_only",False))
+        self.active_group_only.toggled.connect(self.active_group_filter_changed)
+        layout.addWidget(self.active_group_only)
+        self.found_count = QLabel("Znaleziono: 0")
+        self.found_count.setWordWrap(True)
+        self.found_count.setStyleSheet("font-size: 18px; font-weight: bold; padding: 6px;")
+        layout.addWidget(self.found_count)
         self.tabs = QTabWidget()
         self.results, self.conflict_list = QListWidget(), QListWidget()
         self.results.currentItemChanged.connect(self.result_selected)
@@ -770,7 +781,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             if detection.page != self.project.page:
                 self.pages.setCurrentRow(detection.page)
             self.view.focus_rect(detection.rect)
-            self.view.draw_detections(self.project, self.conflict_ids, self.selected, self.review_only.isChecked())
+            self.view.draw_detections(self.project, self.conflict_ids, self.selected, self.review_only.isChecked(), self.active_group_only.isChecked())
             self.debug_panel.inspect(self.selected_detection(),self.project)
             self.registry.refresh()
 
@@ -907,7 +918,9 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.groups.clear()
         for group in self.project.groups:
             numbers = counts(self.project, group.id, self.conflict_ids)
-            item = QTreeWidgetItem([group.name, *map(str, numbers)])
+            pending = sum(not d.group and d.requested_group==group.id and d.decision!='rejected'
+                          for d in self.project.detections)
+            item = QTreeWidgetItem([group.name, str(sum(numbers)+pending), *map(str, numbers)])
             item.setData(0, Qt.ItemDataRole.UserRole, group.id)
             item.setCheckState(0, Qt.CheckState.Checked if group.visible else Qt.CheckState.Unchecked)
             item.setForeground(0, QColor(group.color))
@@ -949,7 +962,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             if not d.group:
                 status = "BEZ PRZYPISANIA · " + status
             origin = "ręczny" if d.source == "manual" else f"kształt {d.graphic_score or d.score:.0%}"
-            item = QListWidgetItem(f"{status} · {d.label or '?'} · {origin} | {self.project.pages[d.page]['name']}")
+            item = QListWidgetItem(f"{status} · {d.label or '?'} · {origin} | {d.page+1:02} · {self.project.pages[d.page]['name']}")
             item.setToolTip(f"Kształt: {d.graphic_score:.1%}\nZgodność tekstu: {d.text_score:.0%}\nPowiązanie przestrzenne: {d.spatial_association_score:.1%}\nOcena łączna: {d.confidence:.1%} (nie prawdopodobieństwo)\nŹródło: warstwa tekstowa PDF\nPowód: {d.reason}")
             item.setData(Qt.ItemDataRole.UserRole, d.id)
             self.results.addItem(item)
@@ -959,15 +972,24 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.template_preview.set_template(group.template if group else None,group.label if group else "")
         if group:
             accepted, review, conflict = counts(self.project, group.id, self.conflict_ids)
+            on_page = sum((d.group or d.requested_group)==group.id and d.page==self.project.page
+                          and d.decision!='rejected' for d in self.project.detections)
             pending = sum(not d.group and d.requested_group == group.id and d.decision != "rejected" for d in self.project.detections)
+            self.found_count.setText(f"Znaleziono: {accepted+review+conflict+pending} · na stronie: {on_page}")
             others = Counter(d["label"] for d in self.project.discoveries if d["requested_group"] == group.id)
             other_text = ", ".join(f"{code}: {number}" for code, number in others.items()) or "brak"
             legend=sum(r.get("counts",{}).get("legend_matches",0) for key,r in self.project.analysis_reports.items() if key.startswith(group.id+":"))
-            self.summary.setText(f"Znaleziono {accepted+review+conflict} · {legend} w legendzie / uwagach (nie doliczono)\n{group.name} · oznaczenie: {group.label or ('możliwe '+group.possible_label if group.possible_label else 'brak — wzorzec graficzny')}\n{accepted} zatwierdzonych · {review} do sprawdzenia · {conflict} w konflikcie\nBez przypisania: {pending}\nInne oznaczenia: {other_text}")
+            self.summary.setText(f"Znaleziono {accepted+review+conflict+pending} · {legend} w legendzie / uwagach (nie doliczono)\n{group.name} · oznaczenie: {group.label or ('możliwe '+group.possible_label if group.possible_label else 'brak — wzorzec graficzny')}\n{accepted} zatwierdzonych · {review} do sprawdzenia · {conflict} w konflikcie\nBez przypisania: {pending}\nInne oznaczenia: {other_text}")
         else:
+            self.found_count.setText("Znaleziono: 0")
             self.summary.setText("Zaznacz wzorzec z oznaczeniem lub utwórz grupę.")
-        self.view.draw_detections(self.project, self.conflict_ids, self.selected, self.review_only.isChecked())
+        self.view.draw_detections(self.project, self.conflict_ids, self.selected, self.review_only.isChecked(), self.active_group_only.isChecked())
         self.refreshing = False
+
+
+    def active_group_filter_changed(self, checked):
+        self.settings_store.set("view/active_group_only",checked)
+        self.refresh_results()
 
 
     def closeEvent(self, event):
@@ -981,4 +1003,3 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.performance.close()
         self.jobs.close()
         event.accept()
-

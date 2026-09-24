@@ -100,3 +100,27 @@ def test_cancel_has_no_partial_results(app, document):
         window.dirty = False
         window.close()
 
+
+def test_found_count_active_group_and_page_overlays(app):
+    window=MainWindow()
+    try:
+        a,b=Group('Oprawy'),Group('Gniazda')
+        window.project.groups=[a,b];window.project.active=a.id
+        window.project.pages=[{'name':'Parter'},{'name':'Piętro'}]
+        window.project.detections=[Detection(a.id,0,[20,20,24,8]),
+            Detection(a.id,1,[40,40,24,8]),Detection(b.id,0,[80,80,10,10]),
+            Detection(a.id,0,[120,120,24,8],decision='rejected')]
+        window.view.set_page(300,300);window.refresh()
+        assert window.groups.topLevelItem(0).text(1)=='2'
+        assert window.groups.topLevelItem(0).text(2)=='0'
+        assert window.found_count.text()=='Znaleziono: 2 · na stronie: 1'
+        assert len(window.view.overlays)==2
+        window.active_group_only.setChecked(True)
+        assert len(window.view.overlays)==1
+        assert len(window.project.detections)==4
+        window.project.active=b.id;window.refresh()
+        assert len(window.view.overlays)==1
+        window.active_group_only.setChecked(False)
+        assert len(window.view.overlays)==2
+    finally:
+        window.jobs.close();window.dirty=False;window.close()

@@ -120,12 +120,15 @@ def test_real_encoder_and_independent_tile_path(tmp_path):
 def test_ocr_native_priority_and_real_local_recognition():
     from electrocount.ocr_engine import OCREngine
     from PIL import Image,ImageDraw,ImageFont
+    import reportlab
+    font_path=Path('C:/Windows/Fonts/arial.ttf')
+    if not font_path.exists():font_path=Path(reportlab.__file__).parent/'fonts/Vera.ttf'
     class PDF:
         def inspect(self,path):return [{'width':200,'height':120}]
         def render(self,path,page,scale,rect):
             image=Image.new('RGB',(600,360),'white')
             draw=ImageDraw.Draw(image)
-            draw.text((210,135),'EW1',fill='black',font=ImageFont.truetype('C:/Windows/Fonts/arial.ttf',36))
+            draw.text((210,135),'EW1',fill='black',font=ImageFont.truetype(str(font_path),36))
             x,y,w,h=rect
             return np.array(image.crop((round(x*3),round(y*3),round((x+w)*3),round((y+h)*3))))
     engine=OCREngine();pdf=PDF()

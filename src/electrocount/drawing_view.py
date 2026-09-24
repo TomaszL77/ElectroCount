@@ -134,13 +134,15 @@ class DrawingView(QGraphicsView):
             return
         super().mouseReleaseEvent(event)
 
-    def draw_detections(self, project, conflicts, selected="", only_review=False):
+    def draw_detections(self, project, conflicts, selected="", only_review=False, only_active=False):
         for item in self.overlays:
             self.scene().removeItem(item)
         self.overlays = []
         groups = {g.id: g for g in project.groups}
         for detection in project.detections:
             group = groups.get(detection.group or detection.requested_group)
+            if only_active and (not group or group.id != project.active):
+                continue
             if not group or not group.visible or detection.page != project.page:
                 continue
             if only_review and detection.decision != "review" and detection.id not in conflicts:
@@ -174,4 +176,3 @@ class DrawingView(QGraphicsView):
                 cross = self.scene().addLine(x, y, x+w, y+h, pen)
                 cross.setZValue(6)
                 self.overlays.append(cross)
-
