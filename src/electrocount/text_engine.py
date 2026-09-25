@@ -167,7 +167,7 @@ def prepare_template(engine, path, page, selection):
             "label_item": item.to_dict() if item else None,
             "spatial_association_score": association["score"],
             "reason": association["reason"], "text_aware": True,
-            "definition_version": 6, "geometry_source": "native_local" if signature else "raster",
+            "definition_version": 7, "geometry_source": "native_local" if signature else "raster",
             "text_bbox":item.bbox if item else None,
             "self_check":bool(signature),
             "possible_label": (association.get("alternatives") or [{}])[0].get("normalized_text", "")}

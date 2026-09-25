@@ -20,7 +20,7 @@ class DetectionEngine:
     def find(self,path,page,template,label="",threshold=.82,progress=lambda p:None,template_path=None,status=lambda text:None):
         status("Odczyt tekstu i przygotowanie wzorca")
         source=template_path or path
-        if not template.get("text_aware") or (template.get("definition_version",0)<6 and
+        if not template.get("text_aware") or (template.get("definition_version",0)<7 and
                 template.get("selection_rect") and hasattr(self.pdf,"open_vector_page")):
             template=prepare_template(self.pdf,source,template["page"],template.get("selection_rect",template["rect"]))
         expected=normalize_text(label or template.get("label",""))
@@ -91,6 +91,13 @@ class DetectionEngine:
                     candidate.get("scale",1),candidate.get("raster_angle",candidate.get("rotation",0)))
                 patch=mask_text(self.pdf.render(path,page,2.0,candidate.get("verification_rect",candidate["rect"])),items,candidate.get("verification_rect",candidate["rect"]),2.0)
                 evidence=self.features.verify(transformed,patch)
+                if not evidence['verified'] and hasattr(self.features,'verify_with_context') and evidence.get('reference_coverage',0)>=.99 and evidence.get('fill_consistent',True):
+                    x,y,w,h=candidate.get('verification_rect',candidate['rect'])
+                    meta=self.pdf.inspect(path)[page]
+                    if x>=4 and y>=4 and x+w+4<=meta['width'] and y+h+4<=meta['height']:
+                        context_box=[x-4,y-4,w+8,h+8]
+                        context=mask_text(self.pdf.render(path,page,2.,context_box),items,context_box,2.)
+                        evidence=self.features.verify_with_context(transformed,patch,context,8)
                 candidate.update(evidence)
                 candidate["graphic_score"]=(candidate["score"]+evidence["feature_score"])/2
             if candidate["verified"]:
@@ -240,4 +247,3 @@ class DetectionEngine:
         status("Kończenie analizy strony")
         progress(100)
         return result
-

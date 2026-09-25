@@ -1,4 +1,12 @@
-# Aktualizacja 0.7.1 — 23.09.2026
+# Aktualizacja 0.7.2 — poprawki po testach użytkownika
+
+Wprowadzono normalizację podzielonych prostych w ścieżkach PDF (definition_version=7), odzyskiwanie rastrowego symbolu z potwierdzoną w otoczeniu linią tła i czytelniejsze liczniki/filtr grup. Szczegóły i ograniczenia: docs/detection-072.md. Runtime Windows pozostaje py312-07; nie zmieniono przypiętych zależności ani modelu AI.
+
+Testy w tej sesji: 149 PASS, 4 SKIP z powodu braku prywatnych PDF, 0 błędów. Linux/Python 3.12, Qt offscreen, prawdziwe OCR i DINOv2-small. To nie zastępuje próby na laptopie służbowym. Nowe testy pokazują 3/3 zamiast 1/3 lub 2/3 przy innym podziale odcinków oraz raster QP14 4/4 zamiast 3/4, A1 8/8 zamiast 6/8. Mocniejszy model pozostaje hipotezą do pomiaru na oznaczonych PDF; obecna hybryda na jednym syntetycznym przypadku nie poprawiła wyników względem klasycznego silnika.
+
+Następny krok: otrzymać oryginalny PDF i zapisany projekt ze zdjęć z maila, odtworzyć przypadki HPØ52 i wariantów osprzętu oraz porównać logi obu komputerów. Nie deklarować, że poprawiono te konkretne przypadki na podstawie samych zrzutów.
+
+# Historia: aktualizacja 0.7.1 — 23.09.2026
 
 Poprawiono wyszukiwanie złożonych symboli CAD, rozróżnienie pustych/wypełnionych figur, oddzielenie przewodów i tła, zakres fallbacku rastrowego oraz wyłączenie tabel legend i potwierdzonych ramek uwag bez natywnego tekstu. Szczegóły: docs/cpp203-071.md. Definicja wzorca 6; stare wzorce są przygotowywane ponownie. Runtime i zależności pozostają 0.7, nie tworzyć nowego środowiska bez potrzeby.
 

@@ -147,7 +147,7 @@ def test_old_template_upgrades_on_search_and_preserves_project_page(tmp_path):
     legacy={'page':0,'rect':[106,175,67,21],'selection_rect':[106,175,67,21],
             'label':'QP14','text_aware':True,'signature':None}
     pdf=PdfiumEngine();result=DetectionEngine(pdf).find(path,0,legacy,'QP14')
-    assert result['template']['definition_version']==6 and len(result['matches'])==4
+    assert result['template']['definition_version']==7 and len(result['matches'])==4
     group=Group('Własna nazwa',label='QP14',template={**legacy,'page':7})
     project=Project(groups=[group]);ResultsManager().apply(project,group.id,7,result)
     assert group.name=='Własna nazwa' and group.template['page']==7

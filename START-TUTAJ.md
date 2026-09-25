@@ -1,6 +1,8 @@
 # ElectroCount — drugi komputer
 
-Kod i testy ElectroCount 0.7.1. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
+Kod i testy ElectroCount 0.7.2. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
+
+Po rozpakowaniu tej aktualizacji uruchamiaj **Uruchom.cmd z nowego folderu**. Stary skrót może uruchamiać wcześniejszy kod. W tytule okna ma być **0.7.2**. Jeśli runtime 0.7 już działa, możesz od razu uruchomić program; jeśli brakuje bibliotek, uruchom Instaluj.cmd. Otwórz projekt i ponownie kliknij Znajdź — zapisane wyniki nie przeliczają się same.
 
 1. Zaloguj się do GitHuba na swoje konto. W GitHub Desktop wybierz File → Clone repository i repozytorium ElectroCount. Jeśli korzystasz z paczki ZIP, najpierw rozpakuj cały folder do lokalnego katalogu. Po pobraniu aktualizacji zamknij poprzednią aplikację, uruchom Instaluj.cmd i Uruchom.cmd.
 2. Zainstaluj Python 3.12 64-bit z python.org wraz z Python Launcher. Sprawdzenie: `py -3.12 --version`.
