@@ -95,3 +95,4 @@ class ModelManager:
         valid = digest.hexdigest() == manifest.checksum.lower()
         return {"status":"verified" if valid else "checksum_mismatch","active":False,
                 "manifest":manifest,"path":str(path)}
+

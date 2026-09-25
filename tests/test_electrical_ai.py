@@ -105,3 +105,4 @@ def test_gui_base_default_and_explicit_switch(app,monkeypatch):
         monkeypatch.setattr(QInputDialog,'getItem',lambda *a,**k:('Klasyczny — geometria PDF',True))
         w.toggle_hybrid();assert w.engine_mode()=='classic'
     finally:w.jobs.close();w.dirty=False;w.close()
+

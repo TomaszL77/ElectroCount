@@ -62,3 +62,4 @@ def display_label(label, profile):
     parts.extend(ratings[k] for k in ('IP','EX','PHASE') if k in ratings)
     parts.extend(k+'?' for k in profile.get('uncertain',[]))
     return ' · '.join(parts)
+

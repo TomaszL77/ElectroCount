@@ -169,3 +169,4 @@ def test_native_index_cache_reopens_without_persisting_handles(tmp_path):
     stat=Path(path).stat();os.utime(path,ns=(stat.st_atime_ns,stat.st_mtime_ns+1000000))
     with second.open_vector_page(path,0) as page:
         assert not page.index_cache_hit
+

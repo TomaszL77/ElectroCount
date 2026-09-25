@@ -76,3 +76,4 @@ def cosine(a,b):
     if (a.model_name,a.model_version)!=(b.model_name,b.model_version):
         raise ValueError('Nie można porównywać wektorów pochodzących z różnych modeli.')
     return float(np.clip(np.dot(a.values,b.values),0,1))
+

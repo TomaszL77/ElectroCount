@@ -131,3 +131,4 @@ def self_test(pdf, directory, *, config=None, progress=lambda p:None, status=lam
         'actual':len(result['matches']), 'result_sha256':result['result_sha256'], 'directory':str(directory)}
     write_json(directory/'self_test.json',report)
     return report
+

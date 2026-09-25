@@ -32,3 +32,4 @@ ENGINE_MODES = {'classic':None, 'hybrid':'small', 'hybrid_base':'base'}
 def model_for_mode(mode):
     if mode not in ENGINE_MODES:raise ValueError(f'Nieznany tryb analizy: {mode}')
     return ENGINE_MODES[mode]
+

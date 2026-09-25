@@ -1,3 +1,11 @@
+# Aktualizacja 0.7.3 AI — DINOv2 Base i profil elektryczny
+
+Wariant większego modelu na życzenie użytkownika: Base domyślnie, Small i klasyczny wybierane jawnie z menu. Pełne informacje: docs/ai-base-073.md. Instalator pobiera i weryfikuje Base (347 MB), diagnostyka CLI używa Base. Runtime Windows py312-07 bez zmiany bibliotek. Definicja wzorca 8; profil electrical-takeoff-v1 rozróżnia jawne IP, EX i fazy; brak lub niejednoznaczność wymaga weryfikacji.
+
+Nie dotrenowano wag na prywatnych danych. Benchmark 3 zestawy × 3 tryby: każdy TP=2, FP=0, FN=0, review=1, other=2. Większy model nie poprawił tego już poprawnego wyniku. Base self-test 12/12 PASS i rzeczywisty przepływ GUI sprawdzony. Nadal potrzebne oryginalne PDF-y ze zdjęć i ręczne adnotacje; brak potwierdzenia jakości na laptopie służbowym.
+
+Poniższe sekcje są historią wcześniejszych wersji.
+
 # Aktualizacja 0.7.2 — poprawki po testach użytkownika
 
 Wprowadzono normalizację podzielonych prostych w ścieżkach PDF (definition_version=7), odzyskiwanie rastrowego symbolu z potwierdzoną w otoczeniu linią tła i czytelniejsze liczniki/filtr grup. Szczegóły i ograniczenia: docs/detection-072.md. Runtime Windows pozostaje py312-07; nie zmieniono przypiętych zależności ani modelu AI.
@@ -69,3 +77,4 @@ Następnie wykonano świeże wyszukiwanie przez MainWindow.find_matches i worker
 5. Dopiero po ocenie bazowej rozwijać przygotowane interfejsy ModelManager, ContextEngine, TrainingDatasetManager. OCR, ciężki model, legenda i trening nieaktywne. Nie deklarować ich jako działających.
 
 Wcześniejszy problem: identyczna sąsiednia oprawa L3 nie była wykrywana. Oba sąsiednie symbole są obecnie odnajdywane. Panel postępu zmniejszono do ok. 60 px. Projekt v2 zachowuje kompatybilność ze starszymi projektami. Nie zamykać cudzej uruchomionej aplikacji z niezapisanym projektem.
+

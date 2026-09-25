@@ -43,3 +43,4 @@ class TemplatePreview(QWidget):
         painter.setPen(QColor('#5ecbc0'))
         painter.drawText(QRectF(100,32,max(0,self.width()-102),38),Qt.AlignLeft|Qt.TextWordWrap,
                          'Oznaczenie: '+(self.label or 'brak'))
+

@@ -229,7 +229,7 @@ class DetectionEngine:
                 if not expected:hit['reason']='unlabelled_symbol_geometry_verified'
                 result['matches'].append(hit)
             elif state=='OTHER_VARIANT':
-                hit['reason']=decision_reason
+                hit['reason']='different_label' if decision_reason=='different_device_label' else decision_reason
                 result['discovered_other_label'].append(hit)
             else:
                 hit['reason']=association['reason'] if association['reason']=='shared_label' else decision_reason
@@ -260,3 +260,4 @@ class DetectionEngine:
         status("Kończenie analizy strony")
         progress(100)
         return result
+

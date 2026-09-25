@@ -202,3 +202,4 @@ class TextSpatialIndex:
             for b in range(math.floor((y-radius)/cell),math.floor((y+h+radius)/cell)+1):
                 ids.update(self.cells.get((a,b),()))
         return [self.items[i] for i in sorted(ids)]
+

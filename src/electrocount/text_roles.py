@@ -20,3 +20,4 @@ class TextRoleClassifier:
         if not text or len(text) > 80:
             return 'UNKNOWN', .25
         return 'DEVICE_LABEL', .78 if text.isdigit() else (.65 if ' ' in text else .9)
+

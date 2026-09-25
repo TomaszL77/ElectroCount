@@ -1,8 +1,8 @@
 # ElectroCount — drugi komputer
 
-Kod i testy ElectroCount 0.7.2. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
+Kod i testy ElectroCount 0.7.3. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
 
-Po rozpakowaniu tej aktualizacji uruchamiaj **Uruchom.cmd z nowego folderu**. Stary skrót może uruchamiać wcześniejszy kod. W tytule okna ma być **0.7.2**. Jeśli runtime 0.7 już działa, możesz od razu uruchomić program; jeśli brakuje bibliotek, uruchom Instaluj.cmd. Otwórz projekt i ponownie kliknij Znajdź — zapisane wyniki nie przeliczają się same.
+Po rozpakowaniu tej aktualizacji uruchamiaj **Uruchom.cmd z nowego folderu**. Stary skrót może uruchamiać wcześniejszy kod. W tytule okna ma być **0.7.3**. Jeśli runtime 0.7 już działa, uruchom Instaluj_AI.cmd, aby pobrać większy model Base (347 MB), potem Uruchom.cmd. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Otwórz projekt i ponownie kliknij Znajdź — zapisane wyniki nie przeliczają się same.
 
 1. Zaloguj się do GitHuba na swoje konto. W GitHub Desktop wybierz File → Clone repository i repozytorium ElectroCount. Jeśli korzystasz z paczki ZIP, najpierw rozpakuj cały folder do lokalnego katalogu. Po pobraniu aktualizacji zamknij poprzednią aplikację, uruchom Instaluj.cmd i Uruchom.cmd.
 2. Zainstaluj Python 3.12 64-bit z python.org wraz z Python Launcher. Sprawdzenie: `py -3.12 --version`.
@@ -28,3 +28,10 @@ Lokalne przykłady wymienione w README mogą być nieobecne w paczce kodu. Testy
 
 Po instalacji, w katalogu aplikacji: **Testy.cmd**.
 Dodatkowo ustaw ELECTROCOUNT_TEST_HALA na ścieżkę PDF hali oraz ELECTROCOUNT_TEST_PACK na folder pakietu testowego. Bez tych plików testy rzeczywistych dokumentów są jawnie pomijane.
+
+
+## Większy model i oznaczenia elektryczne
+
+Domyślny model to AI Base. W menu Ustawienia → Model analizy możesz wybrać Base, Small albo klasyczny. Small wymaga jednorazowo `Instaluj_AI.cmd --model small`. Po instalacji analiza jest lokalna i nie potrzebuje internetu.
+
+Zaznacz cały symbol wraz z kodem typu i właściwymi oznaczeniami IP, EX lub faz. Program nie zakłada IP20, jeśli oznaczenia nie ma. Brak wymaganej cechy trafia do sprawdzenia; inny jawny wariant jest oddzielany. Zmiana numeru obwodu nie rozdziela tego samego typu urządzenia. Model nie był trenowany na Twoich prywatnych rysunkach.

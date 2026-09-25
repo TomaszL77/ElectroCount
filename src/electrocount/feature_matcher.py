@@ -184,3 +184,4 @@ class LightGlueFeatureMatcher(LearnedFeatureMatcher):
                     return (f0["keypoints"][0][matches[:,0]].cpu().numpy(),
                             f1["keypoints"][0][matches[:,1]].cpu().numpy())
         super().__init__(Backend())
+

@@ -27,3 +27,4 @@ class AIEngine:
         result['pipeline']['engine_mode']=('hybrid_base' if self.detector.encoder.model_key=='base' else 'hybrid') if getattr(self.detector,'encoder',None) else 'classic'
         result['pipeline']['application_profile']='electrical-takeoff-v1'
         return result
+
