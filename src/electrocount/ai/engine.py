@@ -24,5 +24,6 @@ class AIEngine:
             result['pipeline']['active'] += ['dinov2_embedding','dense_tile_retrieval']
             result['pipeline']['inactive'].remove('neural_encoder')
             result['pipeline']['model']={'name':self.detector.encoder.name,'revision':self.detector.encoder.version}
-        result['pipeline']['engine_mode']='hybrid' if getattr(self.detector,'encoder',None) else 'classic'
+        result['pipeline']['engine_mode']=('hybrid_base' if self.detector.encoder.model_key=='base' else 'hybrid') if getattr(self.detector,'encoder',None) else 'classic'
+        result['pipeline']['application_profile']='electrical-takeoff-v1'
         return result

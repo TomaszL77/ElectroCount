@@ -29,7 +29,7 @@ def execute(request, plan):
     if kind=="template":
         emit({"status":"Wyodrębnianie symbolu i oznaczenia z zaznaczenia…"})
         return prepare_detection(engine,request["path"],request["page"],request["rect"],
-            debug_dir=request.get('debug_dir'),selection_context=request.get('selection_context'),ocr_enabled=request.get('ocr_enabled',False))
+            debug_dir=request.get('debug_dir'),selection_context=request.get('selection_context'),ocr_enabled=request.get('ocr_enabled',False),model_name=request.get('model_name','small'))
     if kind=="inspect":
         return engine.inspect(request["path"])
     if kind=="render":
@@ -56,7 +56,7 @@ def execute(request, plan):
                 config={**plan.to_dict(),**request.get('config',{})},
                 debug_dir=str(Path(request['debug_dir'])/f"page-{page['page']+1}") if request.get('debug_dir') else None)
             template=found["template"]
-            found["pipeline"]["execution"] = plan.to_dict()
+            found["pipeline"]["execution"] = {**plan.to_dict(),**request.get('config',{})}
             results.append({"page":page["page"],"result":found})
         return {"pages":results,"cache_hits":engine.hits}
     if kind=="match":
@@ -73,7 +73,7 @@ def main():
     try:
         from dataclasses import replace
         plan = execution_plan()
-        plan=replace(plan,neural_enabled=request.get('config',{}).get('engine_mode')=='hybrid')
+        plan=replace(plan,neural_enabled=request.get('config',{}).get('engine_mode') in ('hybrid','hybrid_base') or request.get('ocr_enabled',False))
         result = run_with_fallback(lambda current:execute(request,current),plan,
             lambda current:emit({"performance_fallback":current}))
         emit({"result":result,"seconds":time.monotonic()-started})

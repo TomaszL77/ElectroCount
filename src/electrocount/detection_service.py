@@ -10,7 +10,7 @@ from .diagnostics import (RenderRecorder, data_dir, digest, export_images, runti
 from .text_engine import prepare_template
 
 
-def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_context=None, ocr_enabled=False):
+def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_context=None, ocr_enabled=False, model_name='small'):
     try:
         template = prepare_template(pdf, path, page, selection)
         if ocr_enabled and not template.get('label'):
@@ -36,7 +36,7 @@ def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_c
         from .ai.model_manager import ModelManager
         from .text_engine import mask_text
         from dataclasses import asdict
-        encoder=ModelManager(Path(__file__).resolve().parents[2]/'models').load_visual_encoder()
+        encoder=ModelManager(Path(__file__).resolve().parents[2]/'models').load_visual_encoder(model_name)
         box=template.get('raster_rect',template['rect'])
         crop=mask_text(pdf.render(path,page,2.,box),pdf.extract_text(path,page),box,2.)
         template['representation']['visual_embedding']=asdict(encoder.encode(crop))
@@ -71,9 +71,11 @@ def run_detection(pdf, path, page, template, label='', threshold=.82, progress=l
     render_session=RenderSession(pdf)
     recorder = RenderRecorder(render_session, Path(debug_dir)/'renders') if debug_dir else None
     encoder=None
-    if config.get('engine_mode','classic')=='hybrid':
+    from .ai.model_catalog import model_for_mode
+    model_name=model_for_mode(config.get('engine_mode','classic'))
+    if model_name:
         from .ai.model_manager import ModelManager
-        encoder=ModelManager(Path(__file__).resolve().parents[2]/'models').load_visual_encoder()
+        encoder=ModelManager(Path(__file__).resolve().parents[2]/'models').load_visual_encoder(model_name)
     engine = AIEngine(recorder or render_session,visual_encoder=encoder)
     report = {'runtime': runtime_info(), 'path': str(path), 'file_sha256': digest(path),
         'page': page, 'template': template, 'template_bbox': template['rect'],

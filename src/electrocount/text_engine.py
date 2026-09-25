@@ -158,7 +158,9 @@ def prepare_template(engine, path, page, selection):
         meta=engine.inspect(path)[page];x,y,w,h=rect
         left,top=max(0,x-3),max(0,y-3)
         raster_rect=[left,top,min(meta["width"],x+w+3)-left,min(meta["height"],y+h+3)-top]
+    from .electrical_profile import build_profile
     return {"source": "LEGEND" if signature and signature.get('source_legend') else "DRAWING",
+            "electrical_profile":build_profile(rect,selected),
             "associated_texts":association.get('associated_texts',[]),
             "text_role_confidence":association.get('text_role_confidence',0),
             "page": page, "raster_rect":raster_rect, "selection_rect": selection, "rect": rect, "signature": signature,
@@ -167,7 +169,7 @@ def prepare_template(engine, path, page, selection):
             "label_item": item.to_dict() if item else None,
             "spatial_association_score": association["score"],
             "reason": association["reason"], "text_aware": True,
-            "definition_version": 7, "geometry_source": "native_local" if signature else "raster",
+            "definition_version": 8, "geometry_source": "native_local" if signature else "raster",
             "text_bbox":item.bbox if item else None,
             "self_check":bool(signature),
             "possible_label": (association.get("alternatives") or [{}])[0].get("normalized_text", "")}

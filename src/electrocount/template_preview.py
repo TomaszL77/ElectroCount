@@ -13,6 +13,9 @@ class TemplatePreview(QWidget):
         self.template=template;self.label=label
         self.setVisible(bool(template and template.get('signature')))
         self.setToolTip('Wyodrębniony symbol używany do wyszukiwania. Oznaczenie jest sprawdzane osobno.')
+        if template:
+            from .electrical_profile import display_label
+            self.label=display_label(label,template.get('electrical_profile',{}))
         self.update()
 
     def paintEvent(self,event):

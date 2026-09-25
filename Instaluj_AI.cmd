@@ -8,7 +8,7 @@ if not exist "%EC_VENV%\Scripts\python.exe" (
     pause
     exit /b 1
 )
-"%EC_VENV%\Scripts\python.exe" tools\install_models.py
+"%EC_VENV%\Scripts\python.exe" tools\install_models.py %*
 if errorlevel 1 (
     echo Instalacja modelu nie powiodla sie. Zachowaj komunikat bledu.
     pause

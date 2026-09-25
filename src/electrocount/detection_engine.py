@@ -20,7 +20,7 @@ class DetectionEngine:
     def find(self,path,page,template,label="",threshold=.82,progress=lambda p:None,template_path=None,status=lambda text:None):
         status("Odczyt tekstu i przygotowanie wzorca")
         source=template_path or path
-        if not template.get("text_aware") or (template.get("definition_version",0)<7 and
+        if not template.get("text_aware") or (template.get("definition_version",0)<8 and
                 template.get("selection_rect") and hasattr(self.pdf,"open_vector_page")):
             template=prepare_template(self.pdf,source,template["page"],template.get("selection_rect",template["rect"]))
         expected=normalize_text(label or template.get("label",""))
@@ -159,6 +159,9 @@ class DetectionEngine:
             reference_embedding=self.encoder.encode(reference_image)
             template['representation']['visual_embedding']=asdict(reference_embedding)
         if self.encoder:status('Analiza AI i koloru: ocena podobieństwa kandydatów')
+        from .electrical_profile import build_profile,compare_profiles,display_label
+        peer_rects=[c['rect'] for c in candidates]
+        expected_profile=template.get('electrical_profile',{})
         for hit_index,(candidate,association) in enumerate(zip(candidates,associations)):
             progress(85+round(14*(hit_index+1)/max(1,len(candidates))))
             item=association["item"]
@@ -204,6 +207,16 @@ class DetectionEngine:
             if item and item.source=='ocr':
                 signals['text_score']=signals['device_label_score']=item.confidence if exact else 0.
             state,confidence,decision_reason=FinalDecisionEngine().decide(expected,actual,signals)
+            candidate_profile=build_profile(candidate['rect'],
+                text_index.near(candidate['rect'],max(12.,max(candidate['rect'][2:])*.75))+
+                association.get('associated_texts',[]),peer_rects)
+            profile_state,profile_reason=compare_profiles(expected_profile,candidate_profile)
+            if state=='MATCH' and profile_state!='MATCH':
+                state,decision_reason=profile_state,profile_reason
+            hit['verification_details']['electrical_profile']=candidate_profile
+            hit['verification_details']['expected_electrical_profile']=expected_profile
+            if profile_state=='OTHER_VARIANT':
+                hit['label']=display_label(actual,candidate_profile) or actual
             if item and item.source=='ocr' and item.confidence<.95 and state=='MATCH':
                 state,decision_reason='REVIEW','uncertain_ocr_label'
             hit['text_source']=item.source if item else None
@@ -216,7 +229,7 @@ class DetectionEngine:
                 if not expected:hit['reason']='unlabelled_symbol_geometry_verified'
                 result['matches'].append(hit)
             elif state=='OTHER_VARIANT':
-                hit['reason']='different_label'
+                hit['reason']=decision_reason
                 result['discovered_other_label'].append(hit)
             else:
                 hit['reason']=association['reason'] if association['reason']=='shared_label' else decision_reason

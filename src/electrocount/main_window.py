@@ -105,7 +105,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             write_json(data_dir()/"logs"/"runtime_info.json",self.startup_runtime)
         plan = self.performance.plan
         self.jobs.performance_plan = plan.to_dict()
-        self.performance_button.setText("Stała jakość · CPU")
+        self.performance_button.setText({'hybrid_base':'AI Base · CPU','hybrid':'AI Small · CPU','classic':'Klasyczny · CPU'}[self.engine_mode()])
         self.performance_button.setToolTip(f"{plan.reason}\n{self.performance.state}\nJednakowa analiza na każdym komputerze.")
 
     def toggle_artifacts(self):
@@ -137,8 +137,22 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.statusBar().showMessage('Zmieniono źródło wzorca. Naciśnij Znajdź, aby przeliczyć wyniki.',12000)
         self.registry.refresh()
 
+    def engine_mode(self):
+        from .ai.model_catalog import model_for_mode
+        mode=self.settings_store.text('detection/engine_mode_073','hybrid_base')
+        model_for_mode(mode)
+        return mode
+
     def toggle_hybrid(self):
-        self.settings_store.set('detection/hybrid',not self.settings_store.get('detection/hybrid',False))
+        modes={'AI Base — większy model':'hybrid_base','AI Small — lżejszy model':'hybrid',
+               'Klasyczny — geometria PDF':'classic'}
+        labels=list(modes)
+        current=list(modes.values()).index(self.engine_mode())
+        selected,ok=QInputDialog.getItem(self,'Tryb analizy','Wybierz model do kolejnego wyszukiwania:',labels,current,False)
+        if not ok:return
+        self.settings_store.set('detection/engine_mode_073',modes[selected])
+        self.statusBar().showMessage('Wybrano '+selected+'. Kliknij Znajdź, aby przeliczyć wyniki.',15000)
+        self.update_performance()
         self.registry.refresh()
 
     def show_performance(self):
@@ -180,8 +194,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("template_legend", "Wzorzec pochodzi z legendy", "template", self.toggle_template_legend,
                 lambda:active() and bool(self.project.active_group().template),
                 checked=lambda:bool(self.project.active_group() and self.project.active_group().template and self.project.active_group().template.get('source')=='LEGEND')),
-            Command("hybrid", "Hybryda DINOv2 — porównanie eksperymentalne", "settings", self.toggle_hybrid,
-                lambda:not self.busy and not self.loading, checked=lambda:self.settings_store.get('detection/hybrid',False)),
+            Command("hybrid", "Model analizy: Base / Small / klasyczny…", "settings", self.toggle_hybrid,
+                lambda:not self.busy and not self.loading),
             Command("performance", "Wydajność i sprzęt", "settings", self.show_performance),
             Command("settings", "Próg konfliktu", "settings", self.settings, lambda: not self.busy),
         ]
@@ -660,7 +674,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
     def set_mode(self, mode):
         self.view.set_mode(mode)
         self.hint.setText({"pan": "Rolka: zoom · przeciągnij: przesuwanie",
-                          "template": "Zaznacz symbol + oznaczenie · Esc: anuluj",
+                          "template": "Zaznacz symbol + typ + IP / EX / fazy, jeśli podane · Esc: anuluj",
                           "manual": "Zaznacz prostokątem element do dodania"}[mode])
         self.registry.refresh()
 
@@ -692,6 +706,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                     name = f"Symbol {self.project.symbol_serial:02}"
                 else:
                     name = detected
+                from .electrical_profile import display_label
+                name=display_label(name,template.get('electrical_profile',{}))
                 if target is None:
                     target = Group(name, self.PALETTE[len(self.project.groups)%len(self.PALETTE)])
                     self.project.groups.append(target)
@@ -706,7 +722,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 self.refresh()
             self.jobs.submit({"kind": "template", "path": path, "page": source_page, "rect": rect,
                 "selection_context":self.view.last_selection_context,
-                "ocr_enabled":self.settings_store.get("detection/hybrid",False),
+                "ocr_enabled":self.engine_mode()!='classic',
+                "model_name":'base' if self.engine_mode()=='hybrid_base' else 'small',
                 "debug_dir":str(new_debug_run()) if self.settings_store.get("debug/artifacts",False) else None}, prepared)
         elif self.view.mode == "manual" and group:
             self.checkpoint()
@@ -754,7 +771,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             "template": template, "template_path": template_path, "label": group.label,
             "threshold": self.project.threshold,
             "config":{"search_scope":"current_page" if self.current_page_only.isChecked() else "all_pages",
-                "engine_mode":"hybrid" if self.settings_store.get("detection/hybrid",False) else "classic",
+                "engine_mode":self.engine_mode(),
                 "pages":indices,"text_filter":"exact_native","ai_mode":"deterministic_cpu","gui_runtime":self.startup_runtime},
             "debug_dir":str(new_debug_run()) if self.settings_store.get("debug/artifacts",False) else None}, ready, analysis=True)
 
