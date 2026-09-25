@@ -4,6 +4,8 @@ Wariant większego modelu na życzenie użytkownika: Base domyślnie, Small i kl
 
 Nie dotrenowano wag na prywatnych danych. Benchmark 3 zestawy × 3 tryby: każdy TP=2, FP=0, FN=0, review=1, other=2. Większy model nie poprawił tego już poprawnego wyniku. Base self-test 12/12 PASS i rzeczywisty przepływ GUI sprawdzony. Nadal potrzebne oryginalne PDF-y ze zdjęć i ręczne adnotacje; brak potwierdzenia jakości na laptopie służbowym.
 
+Weryfikacja końcowa: pełny przebieg 157 PASS / 5 błędów / 4 SKIP, następnie naprawa trzech limitów GUI i dwóch powodów decyzji oraz 43 PASS / 1 SKIP / 0 błędów w dotkniętych modułach. Łączne pokrycie po poprawkach: 162 przypadki zaliczone, cztery wymagają prywatnych PDF. Nie powtarzano całości. Końcowy Base CLI 12/12 PASS i GUI sprawdzone. Szczegóły w docs/ai-base-073.md.
+
 Poniższe sekcje są historią wcześniejszych wersji.
 
 # Aktualizacja 0.7.2 — poprawki po testach użytkownika

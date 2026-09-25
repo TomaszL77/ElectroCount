@@ -42,3 +42,11 @@ Brakuje oryginalnych prywatnych PDF-ów ze zdjęć użytkownika. Testy wymagają
 | DINOv2 Base | 3/3 poprawne | 2/2 | 0 / 0 | 1 | 2 |
 
 Model Base przeszedł także self-test 12/12 i rzeczywiste wywołanie z GUI: dwa G1 IP44, jeden G1 bez IP do ręcznej weryfikacji, osobno G1 IP20 i G2. W logu potwierdzono `hybrid_base` i przypiętą rewizję modelu.
+
+Na CPU Base jest kosztowniejszy od Small i trybu klasycznego. W pierwszym pełnym przebiegu trzy dotychczasowe testy GUI przekroczyły 35-sekundowy limit podczas wyszukiwania. Limit zmieniono wyłącznie dla pełnej analizy Base do 180 s; krótki limit importu i interakcji pozostał bez zmian. Testy sprawdzają nadal kompletne wyniki, zapis, odczyt i anulowanie. Usunięto również regresję pola `reason`: inny kod urządzenia zachowuje `different_label`, inna cecha elektryczna otrzymuje `different_electrical_rating`.
+
+### Końcowy stan testów
+
+Pełny przebieg: 157 zaliczonych, 5 niezaliczonych, 4 pominięte (319,99 s). Pięć błędów obejmowało trzy limity czasu analizy Base w GUI i dwa powody `different_label`; wszystkie zostały naprawione. Ponowny przebieg całych dotkniętych modułów: **43 PASS, 1 SKIP, 0 błędów (502,04 s)**. Obejmował nowe testy elektryczne, stare etykiety, import, interfejs, zapis/odczyt, anulowanie i diagnostykę. Łącznie po poprawkach pokryto 162 zaliczone przypadki; nie powtarzano całego zestawu od początku. Cztery testy prywatnych dokumentów pozostają niewykonane.
+
+Końcowy CLI Base: **PASS 12/12**, `neural_enabled=true`, prawdziwa przypięta rewizja Base w logu. Końcowy rzeczywisty przebieg GUI także poprawny; obejrzano zrzut okna z polskim powodem braku cechy. Środowisko: Linux, Python 3.12.14, PySide6 6.11.2, PDFium 5.13.0, OpenCV 5.0.0.93, NumPy 2.5.3, ONNX Runtime 1.22.1, Qt offscreen.
