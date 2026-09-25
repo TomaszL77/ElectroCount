@@ -5,6 +5,8 @@ import re
 class TextRoleClassifier:
     def classify(self, text):
         text = ' '.join(text.upper().split())
+        from .electrical_profile import modifier
+        if modifier(text):return 'DEVICE_MODIFIER', .95
         if re.fullmatch(r'[^\s/]+/\d+(?:[.\-]\d+)*', text):
             return 'CIRCUIT_REFERENCE', .97
         if re.fullmatch(r'(?:IP\s*\d{2}|EX|IK\d{2})', text):
@@ -18,3 +20,4 @@ class TextRoleClassifier:
         if not text or len(text) > 80:
             return 'UNKNOWN', .25
         return 'DEVICE_LABEL', .78 if text.isdigit() else (.65 if ' ' in text else .9)
+

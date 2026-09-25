@@ -13,6 +13,9 @@ class TemplatePreview(QWidget):
         self.template=template;self.label=label
         self.setVisible(bool(template and template.get('signature')))
         self.setToolTip('Wyodrębniony symbol używany do wyszukiwania. Oznaczenie jest sprawdzane osobno.')
+        if template:
+            from .electrical_profile import display_label
+            self.label=display_label(label,template.get('electrical_profile',{}))
         self.update()
 
     def paintEvent(self,event):
@@ -40,3 +43,4 @@ class TemplatePreview(QWidget):
         painter.setPen(QColor('#5ecbc0'))
         painter.drawText(QRectF(100,32,max(0,self.width()-102),38),Qt.AlignLeft|Qt.TextWordWrap,
                          'Oznaczenie: '+(self.label or 'brak'))
+
