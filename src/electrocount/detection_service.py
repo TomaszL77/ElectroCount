@@ -40,6 +40,7 @@ def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_c
         box=template.get('raster_rect',template['rect'])
         crop=mask_text(pdf.render(path,page,2.,box),pdf.extract_text(path,page),box,2.)
         template['representation']['visual_embedding']=asdict(encoder.encode(crop))
+        template['representation']['visual_features'].update(embedding=template['representation']['visual_embedding'])
     template['selection_context'] = selection_context or {}
     if debug_dir:
         try:
@@ -131,4 +132,3 @@ def self_test(pdf, directory, *, config=None, progress=lambda p:None, status=lam
         'actual':len(result['matches']), 'result_sha256':result['result_sha256'], 'directory':str(directory)}
     write_json(directory/'self_test.json',report)
     return report
-

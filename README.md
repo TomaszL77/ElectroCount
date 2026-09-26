@@ -1,10 +1,13 @@
-# ElectroCount 0.7.3 AI — większy model i profil elektryczny
+# ElectroCount 0.7.4 — symbol, kolor i oznaczenie
 
 Lokalna aplikacja Windows do zliczania konkretnego symbolu wybranego na rzucie albo w legendzie. Wzorzec łączy geometrię, kolor, oznaczenie i jego otoczenie. Program nie klasyfikuje automatycznie wszystkich instalacji.
 
 0.7.2 poprawia zgodność symboli z podzielonymi odcinkami w PDF oraz analizę obrazową symboli przeciętych linią biegnącą poza wzorcem. Panel pokazuje wyraźny licznik znalezionych i filtr aktywnej grupy. [Zmiany i zakres testów](docs/detection-072.md).
 
 Profil elektryczny rozróżnia jawne IP20/IP44, EX i 1~/3~. Brak wymaganego oznaczenia kieruje wynik do weryfikacji, a numery obwodów nie tworzą nowych typów. [Zmiany i testy 0.7.3](docs/ai-base-073.md).
+
+
+**0.7.4:** osobny oryginał RGB i obraz dopasowania, kolorowy podgląd, kontekst tekstowy ze wszystkich stron oraz oddzielenie numeru urządzenia od opisów obwodów. Identyczne symbole 7 i 8 są rozdzielane; brak oznaczenia trafia do REVIEW i nie zwiększa licznika grupy. [Raport 0.7.4, punktacja i testy](docs/template-074.md).
 
 ## Uruchomienie
 
@@ -43,4 +46,3 @@ Wariant 0.7.3 AI przygotowano do testowania większego modelu na życzenie użyt
 Testy rzeczywistych dokumentów wymagają `ELECTROCOUNT_TEST_HALA` i `ELECTROCOUNT_TEST_PACK`. Bez plików są jawnie pomijane. Benchmark parowany: `python tools/benchmark_retrieval.py --output <folder> --hall <PDF_hali>`. Zawiera metryki precision, recall, F1, FP, FN z dopasowaniem lokalizacji 1:1; sama zgodność ilości nie wystarcza.
 
 DWG/DXF nadal korzystają z interfejsu CADEngine; nie dodano prowizorycznego parsera DWG. Nie ma jeszcze samodzielnego EXE.
-

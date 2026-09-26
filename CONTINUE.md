@@ -1,3 +1,11 @@
+# Aktualizacja 0.7.4 — pełniejsza analiza wzorca
+
+Rozszerzenie istniejącego matchera: oryginalny RGB + osobny obraz dopasowania, wzorzec w definicji 9, kontekst i rotacja tekstu, role W:/O:/TP, odporniejszy histogram koloru, miękki sygnał koloru, osobne oceny i diagnostyka, kolorowy podgląd. REVIEW bez grupy nie zwiększa jej ilości. Aktualny raport: docs/template-074.md.
+
+Końcowa pełna regresja 176 PASS, 4 SKIP, 0 błędów (134,88 s). Nowe 14 przypadków obejmuje 7/8, RGB, kolor, OCR/native, położenie/obrót i migrację legend. Rzeczywisty przepływ GUI Base i zapis projektu sprawdzony. Benchmark klasyczny/Small/Base: 3 MATCH (7), 1 REVIEW (brak kodu), 1 OTHER_VARIANT (8). Oryginalne prywatne PDF-y nadal nieobecne; nie deklarować potwierdzonej poprawy całego dokumentu ze zrzutów.
+
+Poniżej historia wcześniejszych wersji.
+
 # Aktualizacja 0.7.3 AI — DINOv2 Base i profil elektryczny
 
 Wariant większego modelu na życzenie użytkownika: Base domyślnie, Small i klasyczny wybierane jawnie z menu. Pełne informacje: docs/ai-base-073.md. Instalator pobiera i weryfikuje Base (347 MB), diagnostyka CLI używa Base. Runtime Windows py312-07 bez zmiany bibliotek. Definicja wzorca 8; profil electrical-takeoff-v1 rozróżnia jawne IP, EX i fazy; brak lub niejednoznaczność wymaga weryfikacji.
@@ -79,4 +87,3 @@ Następnie wykonano świeże wyszukiwanie przez MainWindow.find_matches i worker
 5. Dopiero po ocenie bazowej rozwijać przygotowane interfejsy ModelManager, ContextEngine, TrainingDatasetManager. OCR, ciężki model, legenda i trening nieaktywne. Nie deklarować ich jako działających.
 
 Wcześniejszy problem: identyczna sąsiednia oprawa L3 nie była wykrywana. Oba sąsiednie symbole są obecnie odnajdywane. Panel postępu zmniejszono do ok. 60 px. Projekt v2 zachowuje kompatybilność ze starszymi projektami. Nie zamykać cudzej uruchomionej aplikacji z niezapisanym projektem.
-

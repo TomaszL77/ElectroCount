@@ -711,6 +711,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 if target is None:
                     target = Group(name, self.PALETTE[len(self.project.groups)%len(self.PALETTE)])
                     self.project.groups.append(target)
+                template['group_id']=target.id
+                template['representation']['group_id']=target.id
                 target.name, target.label, target.template = name, detected, template
                 target.possible_label = template.get("possible_label", "")
                 self.project.active = target.id
@@ -937,7 +939,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             numbers = counts(self.project, group.id, self.conflict_ids)
             pending = sum(not d.group and d.requested_group==group.id and d.decision!='rejected'
                           for d in self.project.detections)
-            item = QTreeWidgetItem([group.name, str(sum(numbers)+pending), *map(str, numbers)])
+            item = QTreeWidgetItem([group.name, str(sum(numbers)), *map(str, numbers)])
             item.setData(0, Qt.ItemDataRole.UserRole, group.id)
             item.setCheckState(0, Qt.CheckState.Checked if group.visible else Qt.CheckState.Unchecked)
             item.setForeground(0, QColor(group.color))
@@ -990,16 +992,17 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 self.results.setCurrentItem(item)
         group = self.project.active_group()
         self.template_preview.set_template(group.template if group else None,group.label if group else "")
+        self.debug_panel.inspect(self.selected_detection(),self.project)
         if group:
             accepted, review, conflict = counts(self.project, group.id, self.conflict_ids)
-            on_page = sum((d.group or d.requested_group)==group.id and d.page==self.project.page
+            on_page = sum(d.group==group.id and d.page==self.project.page
                           and d.decision!='rejected' for d in self.project.detections)
             pending = sum(not d.group and d.requested_group == group.id and d.decision != "rejected" for d in self.project.detections)
-            self.found_count.setText(f"Znaleziono: {accepted+review+conflict+pending} · na stronie: {on_page}")
+            self.found_count.setText(f"Znaleziono: {accepted+review+conflict} · na stronie: {on_page}")
             others = Counter(d["label"] for d in self.project.discoveries if d["requested_group"] == group.id)
             other_text = ", ".join(f"{code}: {number}" for code, number in others.items()) or "brak"
             legend=sum(r.get("counts",{}).get("legend_matches",0) for key,r in self.project.analysis_reports.items() if key.startswith(group.id+":"))
-            self.summary.setText(f"Znaleziono {accepted+review+conflict+pending} · {legend} w legendzie / uwagach (nie doliczono)\n{group.name} · oznaczenie: {group.label or ('możliwe '+group.possible_label if group.possible_label else 'brak — wzorzec graficzny')}\n{accepted} zatwierdzonych · {review} do sprawdzenia · {conflict} w konflikcie\nBez przypisania: {pending}\nInne oznaczenia: {other_text}")
+            self.summary.setText(f"Znaleziono {accepted+review+conflict} · {legend} w legendzie / uwagach (nie doliczono)\n{group.name} · oznaczenie: {group.label or ('możliwe '+group.possible_label if group.possible_label else 'brak — wzorzec graficzny')}\n{accepted} zatwierdzonych · {review} do sprawdzenia · {conflict} w konflikcie\nOsobno, bez przypisania: {pending}\nInne oznaczenia: {other_text}")
         else:
             self.found_count.setText("Znaleziono: 0")
             self.summary.setText("Zaznacz wzorzec z oznaczeniem lub utwórz grupę.")
@@ -1023,4 +1026,3 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.performance.close()
         self.jobs.close()
         event.accept()
-

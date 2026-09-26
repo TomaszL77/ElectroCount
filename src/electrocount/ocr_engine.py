@@ -32,7 +32,8 @@ class OCREngine:
             bbox=[*start.tolist(),*(end-start).tolist()]
             if any(intersection(bbox,i.bbox)>.3*bbox[2]*bbox[3] for i in native_items):continue
             result.append(PdfTextItem(text,normalize_text(text),page,bbox,((start+end)/2).tolist(),
-                source='ocr',confidence=float(confidence)))
+                source='ocr',confidence=float(confidence),
+                rotation=float(np.degrees(np.arctan2(*(points[1]-points[0])[::-1]))%360)))
         self.cache[key]=result
         return result
 

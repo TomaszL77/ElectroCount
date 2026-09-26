@@ -9,6 +9,9 @@ class ResultsManager:
         updated_template=result.get("template",{})
         if updated_template.get("definition_version",0)>=(group.template or {}).get("definition_version",0) and updated_template.get("representation"):
             group.template={**updated_template,"page":(group.template or {}).get("page",page)}
+        if group.template and group.template.get('representation'):
+            group.template['group_id']=group.id
+            group.template['representation']['group_id']=group.id
         if not group.label:
             group.label = result["label"]
         previous = [d for d in project.detections if d.page == page and d.source == "automatic"

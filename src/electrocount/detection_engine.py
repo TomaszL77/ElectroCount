@@ -20,9 +20,13 @@ class DetectionEngine:
     def find(self,path,page,template,label="",threshold=.82,progress=lambda p:None,template_path=None,status=lambda text:None):
         status("Odczyt tekstu i przygotowanie wzorca")
         source=template_path or path
-        if not template.get("text_aware") or (template.get("definition_version",0)<8 and
+        if not template.get("text_aware") or (template.get("definition_version",0)<9 and
                 template.get("selection_rect") and hasattr(self.pdf,"open_vector_page")):
-            template=prepare_template(self.pdf,source,template["page"],template.get("selection_rect",template["rect"]))
+            previous=template
+            template=prepare_template(self.pdf,source,template['page'],template.get('selection_rect',template['rect']))
+            template['source']=previous.get('source',template['source'])
+            template['group_id']=previous.get('group_id',previous.get('representation',{}).get('group_id'))
+            template['id']=previous.get('id',previous.get('representation',{}).get('id'))
         expected=normalize_text(label or template.get("label",""))
         items=self.pdf.extract_text(path,page)
         template_items=items if source==path and page==template["page"] else self.pdf.extract_text(source,template["page"])
@@ -118,8 +122,18 @@ class DetectionEngine:
             from .ocr_engine import OCREngine
             ocr=OCREngine()
         for candidate in verified:
-            candidate["association_result"]=self.text.associate(candidate["rect"],text_index,
-                None if template.get("source")=="LEGEND" else transformed_layout(template.get("association"),candidate.get("rotation",0),candidate.get("scale",1)))
+            layout=None if template.get('source')=='LEGEND' else template.get('association')
+            options=[self.text.associate(candidate['rect'],text_index,
+                transformed_layout(layout,candidate.get('rotation',0),candidate.get('scale',1)))]
+            if layout and candidate.get('rotation',0)%360:
+                # Text may stay horizontal while the device rotates. Neither option
+                # gets any knowledge of the requested label.
+                options.append(self.text.associate(candidate['rect'],text_index,transformed_layout(layout,0,candidate.get('scale',1))))
+            options.sort(key=lambda a:(a['item'] is not None,a['score']),reverse=True)
+            chosen=options[0]
+            if len(options)>1 and all(a['item'] for a in options) and options[0]['item'].normalized_text!=options[1]['item'].normalized_text and abs(options[0]['score']-options[1]['score'])<.10:
+                chosen={**chosen,'item':None,'reason':'ambiguous_label'}
+            candidate['association_result']=chosen
         # Learn repeated layout from unambiguous neighbors on this page, never
         # from the requested label. Legend typography/rotation is often different.
         if template.get('source')=='LEGEND':
@@ -150,7 +164,7 @@ class DetectionEngine:
         from .color_features import color_signature, color_similarity
         from .final_decision import FinalDecisionEngine
         from .template_representation import build_representation
-        if not template.get('representation'):
+        if not template.get('representation',{}).get('original_rgb_crop'):
             template['representation']=build_representation(self.pdf,source,template['page'],template)
         reference_color=template['representation']['color_signature']
         reference_embedding=None
@@ -158,6 +172,7 @@ class DetectionEngine:
             from dataclasses import asdict
             reference_embedding=self.encoder.encode(reference_image)
             template['representation']['visual_embedding']=asdict(reference_embedding)
+            template['representation']['visual_features'].update(embedding=template['representation']['visual_embedding'])
         if self.encoder:status('Analiza AI i koloru: ocena podobieństwa kandydatów')
         from .electrical_profile import build_profile,compare_profiles,display_label
         peer_rects=[c['rect'] for c in candidates]
@@ -206,6 +221,7 @@ class DetectionEngine:
                 'spatial_text_score':spatial,'spatial_association_score':spatial}
             if item and item.source=='ocr':
                 signals['text_score']=signals['device_label_score']=item.confidence if exact else 0.
+            signals.update(shape_score=graphic,visual_score=visual,label_score=signals['device_label_score'],text_association_score=spatial)
             state,confidence,decision_reason=FinalDecisionEngine().decide(expected,actual,signals)
             candidate_profile=build_profile(candidate['rect'],
                 text_index.near(candidate['rect'],max(12.,max(candidate['rect'][2:])*.75))+
@@ -220,6 +236,8 @@ class DetectionEngine:
             if item and item.source=='ocr' and item.confidence<.95 and state=='MATCH':
                 state,decision_reason='REVIEW','uncertain_ocr_label'
             hit['text_source']=item.source if item else None
+            hit.update(shape_score=graphic,visual_score=visual,label_score=signals['device_label_score'],text_association_score=spatial)
+            hit['verification_details'].update(text_source=hit['text_source'],label_rotation=item.rotation if item else None,decision=state)
             hit.update(signals=signals,confidence=confidence,color_score=signals['color_score'],
                 visual_ai_score=visual,status=state,text_role='DEVICE_LABEL' if actual else 'UNKNOWN',
                 text_role_confidence=signals['text_role_confidence'])
@@ -260,4 +278,3 @@ class DetectionEngine:
         status("Kończenie analizy strony")
         progress(100)
         return result
-

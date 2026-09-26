@@ -147,7 +147,7 @@ def test_old_template_upgrades_on_search_and_preserves_project_page(tmp_path):
     legacy={'page':0,'rect':[106,175,67,21],'selection_rect':[106,175,67,21],
             'label':'QP14','text_aware':True,'signature':None}
     pdf=PdfiumEngine();result=DetectionEngine(pdf).find(path,0,legacy,'QP14')
-    assert result['template']['definition_version']==8 and len(result['matches'])==4
+    assert result['template']['definition_version']==9 and len(result['matches'])==4
     group=Group('Własna nazwa',label='QP14',template={**legacy,'page':7})
     project=Project(groups=[group]);ResultsManager().apply(project,group.id,7,result)
     assert group.name=='Własna nazwa' and group.template['page']==7
@@ -169,4 +169,3 @@ def test_native_index_cache_reopens_without_persisting_handles(tmp_path):
     stat=Path(path).stat();os.utime(path,ns=(stat.st_atime_ns,stat.st_mtime_ns+1000000))
     with second.open_vector_page(path,0) as page:
         assert not page.index_cache_hit
-
