@@ -1,12 +1,17 @@
-# ElectroCount 0.7.2 — wyszukiwanie wskazanego wzorca
+# ElectroCount 0.7.4 — symbol, kolor i oznaczenie
 
 Lokalna aplikacja Windows do zliczania konkretnego symbolu wybranego na rzucie albo w legendzie. Wzorzec łączy geometrię, kolor, oznaczenie i jego otoczenie. Program nie klasyfikuje automatycznie wszystkich instalacji.
 
 0.7.2 poprawia zgodność symboli z podzielonymi odcinkami w PDF oraz analizę obrazową symboli przeciętych linią biegnącą poza wzorcem. Panel pokazuje wyraźny licznik znalezionych i filtr aktywnej grupy. [Zmiany i zakres testów](docs/detection-072.md).
 
+Profil elektryczny rozróżnia jawne IP20/IP44, EX i 1~/3~. Brak wymaganego oznaczenia kieruje wynik do weryfikacji, a numery obwodów nie tworzą nowych typów. [Zmiany i testy 0.7.3](docs/ai-base-073.md).
+
+
+**0.7.4:** osobny oryginał RGB i obraz dopasowania, kolorowy podgląd, kontekst tekstowy ze wszystkich stron oraz oddzielenie numeru urządzenia od opisów obwodów. Identyczne symbole 7 i 8 są rozdzielane; brak oznaczenia trafia do REVIEW i nie zwiększa licznika grupy. [Raport 0.7.4, punktacja i testy](docs/template-074.md).
+
 ## Uruchomienie
 
-Python 3.12 64-bit → **Instaluj.cmd** → **Uruchom.cmd**. Instalator pobiera przypięte biblioteki i lokalny model DINOv2-small (89 MB), sprawdza SHA-256, uruchamia test modeli i test kontrolny 12/12. Runtime znajduje się w `%LOCALAPPDATA%/ElectroCount/py312-07`. Inference działa bez internetu. Na drugim komputerze wykonaj osobną instalację; nie kopiuj `.runtime-path` ani środowiska Python.
+Python 3.12 64-bit → **Instaluj.cmd** → **Uruchom.cmd**. Instalator pobiera przypięte biblioteki i lokalny model DINOv2-base (347 MB), sprawdza SHA-256, uruchamia test modeli i test kontrolny 12/12. Runtime znajduje się w `%LOCALAPPDATA%/ElectroCount/py312-07`. Inference działa bez internetu. Na drugim komputerze wykonaj osobną instalację; nie kopiuj `.runtime-path` ani środowiska Python.
 
 [Instrukcja pracy na dwóch komputerach](START-TUTAJ.md) · [Stan prac](CONTINUE.md) · [Trudne symbole CAD — 0.7.1](docs/cpp203-071.md) · [Architektura 0.7](docs/one-shot-07.md)
 
@@ -28,11 +33,11 @@ Nie ma profili ECO / STANDARD / ENHANCED / MAXIMUM. HardwareProfiler pozostaje w
 
 ## Klasyczny i hybrydowy silnik
 
-**Domyślny pozostaje poprawiony silnik klasyczny.** Uwzględnia natywną geometrię PDF, ORB/RANSAC i kontury dla rastra, dokładny tekst, role adnotacji i rozkład koloru. Oznaczenia EW1/EW2 nie są utożsamiane; odwołania TP04/47 i TP04/52 nie rozdzielają urządzenia na typy.
+**W tej wersji AI domyślny jest DINOv2 Base.** Podstawą weryfikacji pozostaje silnik klasyczny. Uwzględnia natywną geometrię PDF, ORB/RANSAC i kontury dla rastra, dokładny tekst, role adnotacji i rozkład koloru. Oznaczenia EW1/EW2 nie są utożsamiane; odwołania TP04/47 i TP04/52 nie rozdzielają urządzenia na typy.
 
-**Ustawienia → Hybryda DINOv2 — porównanie eksperymentalne** dodaje embedding FP32 i niezależne przeszukanie całej strony kafelkami. Model zobaczy również regiony pominięte przez klasyczny generator. Kandydaci są scalani, a potem weryfikowani geometrią i tekstem. Lokalny PP-OCRv4 jest fallbackiem dla regionów bez natywnego oznaczenia; nigdy nie zastępuje dostępnego kodu PDF. Brak modelu powoduje jawny błąd, a nie ciche wyłączenie AI na słabszym PC.
+**Ustawienia → Model analizy: Base / Small / klasyczny…** pozwala wybrać model. Hybryda dodaje embedding FP32 i niezależne przeszukanie całej strony kafelkami. Model zobaczy również regiony pominięte przez klasyczny generator. Kandydaci są scalani, a potem weryfikowani geometrią i tekstem. Lokalny PP-OCRv4 jest fallbackiem dla regionów bez natywnego oznaczenia; nigdy nie zastępuje dostępnego kodu PDF. Brak modelu powoduje jawny błąd, a nie ciche wyłączenie AI na słabszym PC.
 
-Hybryda musi wykazać przewagę precision i recall bez regresji, zanim stanie się domyślna. Nie ma treningu własnego modelu, automatycznego zbierania danych ani wysyłania rysunków do sieci. DINOv2 nie jest specjalistycznym modelem symboli elektrycznych. SuperPoint/LightGlue pozostają interfejsem opcjonalnym; aktywny lokalny matcher korzysta z ORB/RANSAC i analizy konturów.
+Wariant 0.7.3 AI przygotowano do testowania większego modelu na życzenie użytkownika. Domyślny Base nie oznacza potwierdzonej przewagi skuteczności; benchmark syntetyczny nie wykazał poprawy względem Small ani trybu klasycznego. Nie ma treningu własnego modelu, automatycznego zbierania danych ani wysyłania rysunków do sieci. DINOv2 nie jest specjalistycznym modelem symboli elektrycznych. SuperPoint/LightGlue pozostają interfejsem opcjonalnym; aktywny lokalny matcher korzysta z ORB/RANSAC i analizy konturów.
 
 ## Diagnostyka i testy
 

@@ -6,6 +6,7 @@ from electrocount.domain import Group, Detection
 from electrocount.project_manager import ProjectManager
 
 
+# GUI interactions keep a short timeout; full-page Base inference gets 180s explicitly.
 def wait(app, predicate, timeout=35):
     start = time.monotonic()
     while not predicate():
@@ -33,14 +34,14 @@ def test_pdf_group_match_conflict_save_reopen(app, document, tmp_path, monkeypat
         window.refresh()
         assert window.registry.actions["find"].isEnabled()
         window.find_matches()
-        wait(app, lambda: not window.busy)
+        wait(app, lambda: not window.busy, timeout=180)
         assert not errors
         assert len(window.project.detections) == 8
         first = window.project.detections[0]
         window.selected = first.id
         window.decide("rejected")
         window.find_matches()
-        wait(app, lambda: not window.busy)
+        wait(app, lambda: not window.busy, timeout=180)
         assert len(window.project.detections) == 8
         assert first.decision == "rejected"
         window.undo()

@@ -28,7 +28,7 @@ def test_roles_and_missing_labels_do_not_invent_device_types():
     roles=TextRoleClassifier()
     assert roles.classify('TP04/52')[0]=='CIRCUIT_REFERENCE'
     assert roles.classify('IP44')[0]=='DEVICE_MODIFIER'
-    assert roles.classify('117W')[0]=='OTHER'
+    assert roles.classify('117W')[0]=='DESCRIPTION'
     assert TextEngine().associate([0,0,24,24],[text('TP04/47',[25,8,10,8])])['item'] is None
 
 

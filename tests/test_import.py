@@ -117,7 +117,7 @@ def test_prepare_template_in_gui_proposes_label_without_existing_group(app,monke
         assert not prompts
         assert "Wykryte oznaczenie: QP14" in window.statusBar().currentMessage()
         window.find_matches()
-        wait(app,lambda:not window.busy)
+        wait(app,lambda:not window.busy,timeout=180)
         assert len(window.project.detections)==4
         assert len(window.project.discoveries)==8
     finally:

@@ -8,7 +8,7 @@ import pypdfium2 as pdfium
 class PdfiumEngine:
     def __init__(self, vector_segment_limit=40000):
         self.vector_segment_limit = vector_segment_limit
-        self.cache_namespace = f"pdfium-v6-local-vector-limit-{vector_segment_limit}"
+        self.cache_namespace = f"pdfium-v7-text-rotation-local-vector-limit-{vector_segment_limit}"
 
     def inspect(self, path):
         with pdfium.PdfDocument(path) as doc:
@@ -43,7 +43,7 @@ class PdfiumEngine:
             width, height = page.get_size()
             precision = 1000
             converter = pdfium.PdfPosConv(page, (0, 0, round(width*precision), round(height*precision), 0))
-            items, chars, boxes = [], [], []
+            items, chars, boxes, angles = [], [], [], []
 
             def flush():
                 if not chars:
@@ -52,9 +52,10 @@ class PdfiumEngine:
                 left, top = min(b[0] for b in boxes), min(b[1] for b in boxes)
                 right, bottom = max(b[2] for b in boxes), max(b[3] for b in boxes)
                 items.append(PdfTextItem(text, normalize_text(text), page_index,
-                    [left, top, right-left, bottom-top], [(left+right)/2, (top+bottom)/2]))
+                    [left, top, right-left, bottom-top], [(left+right)/2, (top+bottom)/2], rotation=angles[0] if angles else 0.))
                 chars.clear()
                 boxes.clear()
+                angles.clear()
 
             previous_object = None
             for index in range(textpage.count_chars()):
@@ -82,6 +83,9 @@ class PdfiumEngine:
                     size = max(box[2]-box[0], box[3]-box[1], prev[2]-prev[0], prev[3]-prev[1])
                     if distance > size*2.5:
                         flush()
+                angle=-pdfium.raw.FPDFText_GetCharAngle(textpage,index)
+                p0=converter.to_bitmap(0,0);p1=converter.to_bitmap(math.cos(angle)*10,math.sin(angle)*10)
+                angles.append(round(math.degrees(math.atan2(p1[1]-p0[1],p1[0]-p0[0]))%360,3))
                 chars.append(char)
                 boxes.append(box)
             flush()
