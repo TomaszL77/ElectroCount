@@ -169,6 +169,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("pan", "Przesuwaj", "pan", lambda: self.set_mode("pan"), editable, checked=lambda: hasattr(self, "view") and self.view.mode == "pan"),
             Command("fit", "Dopasuj", "fit", lambda: self.view.fit(), editable, "F"),
             Command("group", "Nowa grupa", "new", self.add_group, editable),
+            Command("replace_template", "Wybierz czysty wzorzec tej grupy…", "template", self.replace_template, lambda: active() and bool(self.project.active_group().template)),
             Command("template", "Wzorzec", "template", lambda: self.set_mode("template"), editable, description="Zaznacz symbol wraz z oznaczeniem tekstowym", checked=lambda: hasattr(self, "view") and self.view.mode == "template"),
             Command("find", "Znajdź", "search", self.find_matches, lambda: active() and bool(self.project.active_group().template)),
             Command("manual", "Dodaj ręcznie", "manual", lambda: self.set_mode("manual"), active, checked=lambda: hasattr(self, "view") and self.view.mode == "manual"),
@@ -213,14 +214,14 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.current_page_only.setToolTip("Gdy wyłączone: wszystkie strony wszystkich dokumentów projektu.")
         self.current_page_only.toggled.connect(lambda value: self.settings_store.set("search/current_page_only",value))
         sections = [("Projekt", ["new", "open", "save"]), ("Widok", ["pan", "fit"]),
-                    ("Zliczanie", ["group", "template", "find", "manual"]),
+                    ("Zliczanie", ["group", "template", "replace_template", "find", "manual"]),
                     ("Edycja", ["undo", "redo"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "template_legend", "hybrid", "performance"])]
         for title, keys in sections:
             menu = self.menuBar().addMenu(title)
             if toolbar.actions():
                 toolbar.addSeparator()
             for key in keys:
-                if key not in ("debug","artifacts","diagnostic_test","debug_folder","template_legend","hybrid","performance"):
+                if key not in ("replace_template","debug","artifacts","diagnostic_test","debug_folder","template_legend","hybrid","performance"):
                     toolbar.addAction(self.registry.actions[key])
                 if key=="find":
                     toolbar.addWidget(self.current_page_only)
@@ -671,7 +672,15 @@ class MainWindow(ImportWindowMixin, QMainWindow):
     def threshold_changed(self, value):
         self.project.threshold, self.dirty = value, True
 
+    def replace_template(self):
+        group=self.project.active_group()
+        if not group or not group.template or self.busy or self.loading:return
+        self.set_mode('template')
+        self.replacing_group=group.id
+        self.hint.setText('Zaznacz czysty przykład tego samego typu — zastąpi wzorzec aktywnej grupy · Esc: anuluj')
+
     def set_mode(self, mode):
+        self.replacing_group=None
         self.view.set_mode(mode)
         self.hint.setText({"pan": "Rolka: zoom · przeciągnij: przesuwanie",
                           "template": "Zaznacz symbol + typ + IP / EX / fazy, jeśli podane · Esc: anuluj",
@@ -685,6 +694,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         if self.view.mode == "template":
             page, generation = self.project.page, self.generation
             group_id = group.id if group else None
+            replacing=bool(group_id and getattr(self,"replacing_group",None)==group_id)
             path, source_page = self.project.page_location(page)
             self.loading = True
             self.registry.refresh()
@@ -695,9 +705,17 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                     return
                 template["page"] = page
                 detected = template.get("label", "")
-                self.checkpoint()
                 target = next((g for g in self.project.groups if g.id == group_id), None)
-                if target and (target.template or any(d.group==target.id for d in self.project.detections)):
+                if replacing:
+                    from .electrical_profile import compare_profiles
+                    mismatch=target is None or (target.label and target.label!=detected)
+                    if target and compare_profiles((target.template or {}).get('electrical_profile',{}),template.get('electrical_profile',{}))[0]!='MATCH':mismatch=True
+                    if mismatch:
+                        self.set_mode('pan')
+                        self.statusBar().showMessage('Nie zmieniono wzorca: wskaż czysty przykład z tym samym oznaczeniem i wariantem.',15000)
+                        return
+                self.checkpoint()
+                if target and not replacing and (target.template or any(d.group==target.id for d in self.project.detections)):
                     target = None
                 if not detected:
                     self.project.symbol_serial += 1
@@ -711,6 +729,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 if target is None:
                     target = Group(name, self.PALETTE[len(self.project.groups)%len(self.PALETTE)])
                     self.project.groups.append(target)
+                if replacing:self.invalidate_label(target.id)
                 template['group_id']=target.id
                 template['representation']['group_id']=target.id
                 target.name, target.label, target.template = name, detected, template
@@ -719,6 +738,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 info = f"Wykryte oznaczenie: {detected}" if detected else f"Utworzono {name}"
                 if target.possible_label:
                     info += f" · Możliwe oznaczenie: {target.possible_label}"
+                if replacing:info='Zastąpiono wzorzec. Kliknij Znajdź, aby ponownie zweryfikować wyniki.'
                 self.statusBar().showMessage(info,15000)
                 self.set_mode("pan")
                 self.refresh()

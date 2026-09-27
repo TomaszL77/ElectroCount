@@ -82,6 +82,21 @@ class DetectionEngine:
             recovered,retrieval_stats=VisualRetrieval(self.encoder).find(self.pdf,path,page,template,reference_image,items,
                 lambda p:progress(30+round(p*.2)))
             proposals.extend(recovered)
+        from .occlusion import label_proposals,verify_partial
+        # A native geometry match already explains its label. Do not probe other
+        # rotations around that same annotation, preserving the vector fast path.
+        seed_items=items
+        if not self.custom_matcher:
+            seed_index=TextSpatialIndex(items);explained=set()
+            for candidate in proposals:
+                if not candidate.get('verified'):continue
+                association=self.text.associate(candidate['rect'],seed_index,
+                    transformed_layout(template.get('association'),candidate.get('rotation',0),candidate.get('scale',1)))
+                item=association.get('item')
+                if item and item.source=='pdf_native':explained.add(tuple(item.bbox))
+            seed_items=[i for i in items if tuple(i.bbox) not in explained]
+        seeds=[] if self.custom_matcher else label_proposals(template,expected,seed_items,self.pdf.inspect(path)[page])
+        proposals.extend(seeds)
         progress(50)
         status("Weryfikacja cech i geometrii kandydatów")
         reference=None
@@ -94,7 +109,7 @@ class DetectionEngine:
                 transformed=template_variant(cv2.cvtColor(reference,cv2.COLOR_RGB2GRAY),
                     candidate.get("scale",1),candidate.get("raster_angle",candidate.get("rotation",0)))
                 patch=mask_text(self.pdf.render(path,page,2.0,candidate.get("verification_rect",candidate["rect"])),items,candidate.get("verification_rect",candidate["rect"]),2.0)
-                evidence=self.features.verify(transformed,patch)
+                evidence={'verified':False,'geometry_score':0.,'feature_score':0.} if candidate.get('recovery_only') else self.features.verify(transformed,patch)
                 if not evidence['verified'] and hasattr(self.features,'verify_with_context') and evidence.get('reference_coverage',0)>=.99 and evidence.get('fill_consistent',True):
                     x,y,w,h=candidate.get('verification_rect',candidate['rect'])
                     meta=self.pdf.inspect(path)[page]
@@ -104,6 +119,11 @@ class DetectionEngine:
                         evidence=self.features.verify_with_context(transformed,patch,context,8)
                 candidate.update(evidence)
                 candidate["graphic_score"]=(candidate["score"]+evidence["feature_score"])/2
+            if not candidate['verified'] and not self.custom_matcher:
+                if reference is None:
+                    reference=mask_text(self.pdf.render(source,template['page'],2.,template.get('raster_rect',template['rect'])),template_items,template.get('raster_rect',template['rect']),2.)
+                partial=verify_partial(self.pdf,path,page,template,reference,candidate,items)
+                if partial:candidate.update(partial)
             if candidate["verified"]:
                 verified.append(candidate)
             else:
@@ -147,14 +167,14 @@ class DetectionEngine:
                     if recognized:
                         candidate['association_result']=self.text.associate(candidate['rect'],recognized)
         candidates=[]
-        for candidate in sorted(verified,key=lambda c:(c["geometry_score"]+c["feature_score"]+
+        for candidate in sorted(verified,key=lambda c:(not c.get("partial_occlusion",False),c["geometry_score"]+c["feature_score"]+
                 .2*c["association_result"]["score"]),reverse=True):
             if not any(overlap_metrics(candidate["rect"],other["rect"])[0]>.4 for other in candidates):
                 candidates.append(candidate)
         result={"matches":[],"review":[],"discovered_other_label":[],"label":expected,
                 "template":template,"coverage_warnings":warnings,"text_items":[i.to_dict() for i in items],
                 "rejected_candidates":rejected,
-                "stages":{"generated":len(proposals),"verified":len(candidates),"rejected":len(rejected),
+                "stages":{"occlusion_label_probes":len(seeds),"partial_occlusion_candidates":sum(bool(c.get("partial_occlusion")) for c in candidates),"generated":len(proposals),"verified":len(candidates),"rejected":len(rejected),
                           "ai_retrieval":retrieval_stats,"vector_first":bool(signature and vectors),"raster_used":use_raster,
                           "vector_limit_reached":bool(vectors and vectors.get("truncated")),"native_local":native_stats}}
         progress(85)
@@ -235,6 +255,9 @@ class DetectionEngine:
                 hit['label']=display_label(actual,candidate_profile) or actual
             if item and item.source=='ocr' and item.confidence<.95 and state=='MATCH':
                 state,decision_reason='REVIEW','uncertain_ocr_label'
+            if candidate.get('partial_occlusion') and state!='OTHER_VARIANT':
+                state,decision_reason='REVIEW','partial_occlusion_review'
+            if candidate.get('occlusion'):hit['verification_details']['occlusion']=candidate['occlusion']
             hit['text_source']=item.source if item else None
             hit.update(shape_score=graphic,visual_score=visual,label_score=signals['device_label_score'],text_association_score=spatial)
             hit['verification_details'].update(text_source=hit['text_source'],label_rotation=item.rotation if item else None,decision=state)
@@ -269,6 +292,14 @@ class DetectionEngine:
             if region or is_source:
                 result['legend_matches'].append({**hit,'status':'SOURCE_TEMPLATE' if is_source else 'LEGEND_REFERENCE','reason':'annotation_reference' if region and region.get('kind')=='reference_panel' else 'legend_reference','region':region['rect'] if region else template['rect']})
             else:countable.append(hit)
+        result['occlusion_excluded_references']=[]
+        for hit in list(result['review']):
+            if not hit['verification_details'].get('occlusion'):continue
+            region=region_for(hit['rect'],regions)
+            is_source=template.get('source')=='LEGEND' and source==path and page==template['page'] and overlap_metrics(hit['rect'],template['rect'])[0]>.5
+            if region or is_source:
+                result['review'].remove(hit)
+                result['occlusion_excluded_references'].append(hit)
         result['matches']=countable
         result['counts']={'raw_matches':len(countable)+len(result['legend_matches']),
             'legend_matches':len(result['legend_matches']),'countable_devices':len(countable)}
