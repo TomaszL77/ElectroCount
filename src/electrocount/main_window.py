@@ -105,7 +105,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             write_json(data_dir()/"logs"/"runtime_info.json",self.startup_runtime)
         plan = self.performance.plan
         self.jobs.performance_plan = plan.to_dict()
-        self.performance_button.setText("Stała jakość · CPU")
+        self.performance_button.setText({'hybrid_base':'AI Base · CPU','hybrid':'AI Small · CPU','classic':'Klasyczny · CPU'}[self.engine_mode()])
         self.performance_button.setToolTip(f"{plan.reason}\n{self.performance.state}\nJednakowa analiza na każdym komputerze.")
 
     def toggle_artifacts(self):
@@ -137,8 +137,22 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.statusBar().showMessage('Zmieniono źródło wzorca. Naciśnij Znajdź, aby przeliczyć wyniki.',12000)
         self.registry.refresh()
 
+    def engine_mode(self):
+        from .ai.model_catalog import model_for_mode
+        mode=self.settings_store.text('detection/engine_mode_073','hybrid_base')
+        model_for_mode(mode)
+        return mode
+
     def toggle_hybrid(self):
-        self.settings_store.set('detection/hybrid',not self.settings_store.get('detection/hybrid',False))
+        modes={'AI Base — większy model':'hybrid_base','AI Small — lżejszy model':'hybrid',
+               'Klasyczny — geometria PDF':'classic'}
+        labels=list(modes)
+        current=list(modes.values()).index(self.engine_mode())
+        selected,ok=QInputDialog.getItem(self,'Tryb analizy','Wybierz model do kolejnego wyszukiwania:',labels,current,False)
+        if not ok:return
+        self.settings_store.set('detection/engine_mode_073',modes[selected])
+        self.statusBar().showMessage('Wybrano '+selected+'. Kliknij Znajdź, aby przeliczyć wyniki.',15000)
+        self.update_performance()
         self.registry.refresh()
 
     def show_performance(self):
@@ -155,6 +169,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("pan", "Przesuwaj", "pan", lambda: self.set_mode("pan"), editable, checked=lambda: hasattr(self, "view") and self.view.mode == "pan"),
             Command("fit", "Dopasuj", "fit", lambda: self.view.fit(), editable, "F"),
             Command("group", "Nowa grupa", "new", self.add_group, editable),
+            Command("replace_template", "Wybierz czysty wzorzec tej grupy…", "template", self.replace_template, lambda: active() and bool(self.project.active_group().template)),
             Command("template", "Wzorzec", "template", lambda: self.set_mode("template"), editable, description="Zaznacz symbol wraz z oznaczeniem tekstowym", checked=lambda: hasattr(self, "view") and self.view.mode == "template"),
             Command("find", "Znajdź", "search", self.find_matches, lambda: active() and bool(self.project.active_group().template)),
             Command("manual", "Dodaj ręcznie", "manual", lambda: self.set_mode("manual"), active, checked=lambda: hasattr(self, "view") and self.view.mode == "manual"),
@@ -180,8 +195,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("template_legend", "Wzorzec pochodzi z legendy", "template", self.toggle_template_legend,
                 lambda:active() and bool(self.project.active_group().template),
                 checked=lambda:bool(self.project.active_group() and self.project.active_group().template and self.project.active_group().template.get('source')=='LEGEND')),
-            Command("hybrid", "Hybryda DINOv2 — porównanie eksperymentalne", "settings", self.toggle_hybrid,
-                lambda:not self.busy and not self.loading, checked=lambda:self.settings_store.get('detection/hybrid',False)),
+            Command("hybrid", "Model analizy: Base / Small / klasyczny…", "settings", self.toggle_hybrid,
+                lambda:not self.busy and not self.loading),
             Command("performance", "Wydajność i sprzęt", "settings", self.show_performance),
             Command("settings", "Próg konfliktu", "settings", self.settings, lambda: not self.busy),
         ]
@@ -199,14 +214,14 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.current_page_only.setToolTip("Gdy wyłączone: wszystkie strony wszystkich dokumentów projektu.")
         self.current_page_only.toggled.connect(lambda value: self.settings_store.set("search/current_page_only",value))
         sections = [("Projekt", ["new", "open", "save"]), ("Widok", ["pan", "fit"]),
-                    ("Zliczanie", ["group", "template", "find", "manual"]),
+                    ("Zliczanie", ["group", "template", "replace_template", "find", "manual"]),
                     ("Edycja", ["undo", "redo"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "template_legend", "hybrid", "performance"])]
         for title, keys in sections:
             menu = self.menuBar().addMenu(title)
             if toolbar.actions():
                 toolbar.addSeparator()
             for key in keys:
-                if key not in ("debug","artifacts","diagnostic_test","debug_folder","template_legend","hybrid","performance"):
+                if key not in ("replace_template","debug","artifacts","diagnostic_test","debug_folder","template_legend","hybrid","performance"):
                     toolbar.addAction(self.registry.actions[key])
                 if key=="find":
                     toolbar.addWidget(self.current_page_only)
@@ -657,10 +672,18 @@ class MainWindow(ImportWindowMixin, QMainWindow):
     def threshold_changed(self, value):
         self.project.threshold, self.dirty = value, True
 
+    def replace_template(self):
+        group=self.project.active_group()
+        if not group or not group.template or self.busy or self.loading:return
+        self.set_mode('template')
+        self.replacing_group=group.id
+        self.hint.setText('Zaznacz czysty przykład tego samego typu — zastąpi wzorzec aktywnej grupy · Esc: anuluj')
+
     def set_mode(self, mode):
+        self.replacing_group=None
         self.view.set_mode(mode)
         self.hint.setText({"pan": "Rolka: zoom · przeciągnij: przesuwanie",
-                          "template": "Zaznacz symbol + oznaczenie · Esc: anuluj",
+                          "template": "Zaznacz symbol + typ + IP / EX / fazy, jeśli podane · Esc: anuluj",
                           "manual": "Zaznacz prostokątem element do dodania"}[mode])
         self.registry.refresh()
 
@@ -671,6 +694,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         if self.view.mode == "template":
             page, generation = self.project.page, self.generation
             group_id = group.id if group else None
+            replacing=bool(group_id and getattr(self,"replacing_group",None)==group_id)
             path, source_page = self.project.page_location(page)
             self.loading = True
             self.registry.refresh()
@@ -681,9 +705,17 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                     return
                 template["page"] = page
                 detected = template.get("label", "")
-                self.checkpoint()
                 target = next((g for g in self.project.groups if g.id == group_id), None)
-                if target and (target.template or any(d.group==target.id for d in self.project.detections)):
+                if replacing:
+                    from .electrical_profile import compare_profiles
+                    mismatch=target is None or (target.label and target.label!=detected)
+                    if target and compare_profiles((target.template or {}).get('electrical_profile',{}),template.get('electrical_profile',{}))[0]!='MATCH':mismatch=True
+                    if mismatch:
+                        self.set_mode('pan')
+                        self.statusBar().showMessage('Nie zmieniono wzorca: wskaż czysty przykład z tym samym oznaczeniem i wariantem.',15000)
+                        return
+                self.checkpoint()
+                if target and not replacing and (target.template or any(d.group==target.id for d in self.project.detections)):
                     target = None
                 if not detected:
                     self.project.symbol_serial += 1
@@ -692,21 +724,28 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                     name = f"Symbol {self.project.symbol_serial:02}"
                 else:
                     name = detected
+                from .electrical_profile import display_label
+                name=display_label(name,template.get('electrical_profile',{}))
                 if target is None:
                     target = Group(name, self.PALETTE[len(self.project.groups)%len(self.PALETTE)])
                     self.project.groups.append(target)
+                if replacing:self.invalidate_label(target.id)
+                template['group_id']=target.id
+                template['representation']['group_id']=target.id
                 target.name, target.label, target.template = name, detected, template
                 target.possible_label = template.get("possible_label", "")
                 self.project.active = target.id
                 info = f"Wykryte oznaczenie: {detected}" if detected else f"Utworzono {name}"
                 if target.possible_label:
                     info += f" · Możliwe oznaczenie: {target.possible_label}"
+                if replacing:info='Zastąpiono wzorzec. Kliknij Znajdź, aby ponownie zweryfikować wyniki.'
                 self.statusBar().showMessage(info,15000)
                 self.set_mode("pan")
                 self.refresh()
             self.jobs.submit({"kind": "template", "path": path, "page": source_page, "rect": rect,
                 "selection_context":self.view.last_selection_context,
-                "ocr_enabled":self.settings_store.get("detection/hybrid",False),
+                "ocr_enabled":self.engine_mode()!='classic',
+                "model_name":'base' if self.engine_mode()=='hybrid_base' else 'small',
                 "debug_dir":str(new_debug_run()) if self.settings_store.get("debug/artifacts",False) else None}, prepared)
         elif self.view.mode == "manual" and group:
             self.checkpoint()
@@ -754,7 +793,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             "template": template, "template_path": template_path, "label": group.label,
             "threshold": self.project.threshold,
             "config":{"search_scope":"current_page" if self.current_page_only.isChecked() else "all_pages",
-                "engine_mode":"hybrid" if self.settings_store.get("detection/hybrid",False) else "classic",
+                "engine_mode":self.engine_mode(),
                 "pages":indices,"text_filter":"exact_native","ai_mode":"deterministic_cpu","gui_runtime":self.startup_runtime},
             "debug_dir":str(new_debug_run()) if self.settings_store.get("debug/artifacts",False) else None}, ready, analysis=True)
 
@@ -920,7 +959,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             numbers = counts(self.project, group.id, self.conflict_ids)
             pending = sum(not d.group and d.requested_group==group.id and d.decision!='rejected'
                           for d in self.project.detections)
-            item = QTreeWidgetItem([group.name, str(sum(numbers)+pending), *map(str, numbers)])
+            item = QTreeWidgetItem([group.name, str(sum(numbers)), *map(str, numbers)])
             item.setData(0, Qt.ItemDataRole.UserRole, group.id)
             item.setCheckState(0, Qt.CheckState.Checked if group.visible else Qt.CheckState.Unchecked)
             item.setForeground(0, QColor(group.color))
@@ -962,6 +1001,9 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             if not d.group:
                 status = "BEZ PRZYPISANIA · " + status
             origin = "ręczny" if d.source == "manual" else f"kształt {d.graphic_score or d.score:.0%}"
+            rating_reason={'partial_occlusion_review':'częściowo zasłonięty — sprawdź','missing_electrical_rating':'brak wymaganego IP / EX / faz',
+                           'ambiguous_electrical_rating':'niejednoznaczne IP / EX / fazy'}.get(d.reason)
+            if rating_reason:origin=rating_reason
             item = QListWidgetItem(f"{status} · {d.label or '?'} · {origin} | {d.page+1:02} · {self.project.pages[d.page]['name']}")
             item.setToolTip(f"Kształt: {d.graphic_score:.1%}\nZgodność tekstu: {d.text_score:.0%}\nPowiązanie przestrzenne: {d.spatial_association_score:.1%}\nOcena łączna: {d.confidence:.1%} (nie prawdopodobieństwo)\nŹródło: warstwa tekstowa PDF\nPowód: {d.reason}")
             item.setData(Qt.ItemDataRole.UserRole, d.id)
@@ -970,16 +1012,17 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 self.results.setCurrentItem(item)
         group = self.project.active_group()
         self.template_preview.set_template(group.template if group else None,group.label if group else "")
+        self.debug_panel.inspect(self.selected_detection(),self.project)
         if group:
             accepted, review, conflict = counts(self.project, group.id, self.conflict_ids)
-            on_page = sum((d.group or d.requested_group)==group.id and d.page==self.project.page
+            on_page = sum(d.group==group.id and d.page==self.project.page
                           and d.decision!='rejected' for d in self.project.detections)
             pending = sum(not d.group and d.requested_group == group.id and d.decision != "rejected" for d in self.project.detections)
-            self.found_count.setText(f"Znaleziono: {accepted+review+conflict+pending} · na stronie: {on_page}")
+            self.found_count.setText(f"Znaleziono: {accepted+review+conflict} · na stronie: {on_page}")
             others = Counter(d["label"] for d in self.project.discoveries if d["requested_group"] == group.id)
             other_text = ", ".join(f"{code}: {number}" for code, number in others.items()) or "brak"
             legend=sum(r.get("counts",{}).get("legend_matches",0) for key,r in self.project.analysis_reports.items() if key.startswith(group.id+":"))
-            self.summary.setText(f"Znaleziono {accepted+review+conflict+pending} · {legend} w legendzie / uwagach (nie doliczono)\n{group.name} · oznaczenie: {group.label or ('możliwe '+group.possible_label if group.possible_label else 'brak — wzorzec graficzny')}\n{accepted} zatwierdzonych · {review} do sprawdzenia · {conflict} w konflikcie\nBez przypisania: {pending}\nInne oznaczenia: {other_text}")
+            self.summary.setText(f"Znaleziono {accepted+review+conflict} · {legend} w legendzie / uwagach (nie doliczono)\n{group.name} · oznaczenie: {group.label or ('możliwe '+group.possible_label if group.possible_label else 'brak — wzorzec graficzny')}\n{accepted} zatwierdzonych · {review} do sprawdzenia · {conflict} w konflikcie\nOsobno, bez przypisania: {pending}\nInne oznaczenia: {other_text}")
         else:
             self.found_count.setText("Znaleziono: 0")
             self.summary.setText("Zaznacz wzorzec z oznaczeniem lub utwórz grupę.")

@@ -9,5 +9,5 @@ if not exist "%EC_VENV%\Scripts\python.exe" (
     exit /b 1
 )
 set "PYTHONPATH=%~dp0src"
-"%EC_VENV%\Scripts\python.exe" -m electrocount.debug_cli --self-test
+"%EC_VENV%\Scripts\python.exe" -m electrocount.debug_cli --self-test --engine-mode hybrid_base
 pause

@@ -1,3 +1,31 @@
+# Aktualizacja 0.7.5 — odzysk zasłoniętych symboli
+
+Nowy moduł occlusion.py: maski natywnego tekstu i cienkich linii potwierdzonych po obu stronach symbolu; zgodność widocznych fragmentów w obu kierunkach i min. 3 ćwiartkach; dodatkowe propozycje przy nierozpoznanych oznaczeniach PDF. Każdy odzysk to REVIEW bez przypisania i bez zwiększenia ilości. Nie odtwarzać ukrytych pikseli ani nie obniżać starych progów. Komenda Zliczanie → Wybierz czysty wzorzec tej grupy… wymienia wzorzec, unieważnia stare automatyczne wyniki i wspiera cofnięcie.
+
+Benchmark na identycznym syntetycznym PDF: 0.7.4 klasyczny — 1 MATCH, 0 REVIEW, 0 OTHER; 0.7.5 klasyczny/Small/Base — 1 MATCH, 2 REVIEW, 1 OTHER_VARIANT. Nadal nie odzyskuje dużego niewyjaśnionego ubytku. Większy model nie poprawił wyniku tego zestawu. Raport i odtwarzalny benchmark: docs/occlusion-075.md, tools/benchmark_occlusion_075.py.
+
+Pełna regresja: 182 PASS, 4 SKIP, 142,51 s. Cztery pominięcia dotyczą prywatnych dokumentów. Po pełnej regresji dodano tylko czytelny opis częściowego zasłonięcia na liście wyników; końcowy przepływ GUI sprawdzany ponownie. GUI: prawdziwe przeciągnięcie zaznaczenia, worker Base, zgodność z serwisem, zapis/odczyt projektu. Nie deklarować sprawdzenia instalacji Windows ani całych PDF ze służbowego laptopa.
+
+Poprzednie wersje poniżej.
+
+# Aktualizacja 0.7.4 — pełniejsza analiza wzorca
+
+Rozszerzenie istniejącego matchera: oryginalny RGB + osobny obraz dopasowania, wzorzec w definicji 9, kontekst i rotacja tekstu, role W:/O:/TP, odporniejszy histogram koloru, miękki sygnał koloru, osobne oceny i diagnostyka, kolorowy podgląd. REVIEW bez grupy nie zwiększa jej ilości. Aktualny raport: docs/template-074.md.
+
+Końcowa pełna regresja 176 PASS, 4 SKIP, 0 błędów (134,88 s). Nowe 14 przypadków obejmuje 7/8, RGB, kolor, OCR/native, położenie/obrót i migrację legend. Rzeczywisty przepływ GUI Base i zapis projektu sprawdzony. Benchmark klasyczny/Small/Base: 3 MATCH (7), 1 REVIEW (brak kodu), 1 OTHER_VARIANT (8). Oryginalne prywatne PDF-y nadal nieobecne; nie deklarować potwierdzonej poprawy całego dokumentu ze zrzutów.
+
+Poniżej historia wcześniejszych wersji.
+
+# Aktualizacja 0.7.3 AI — DINOv2 Base i profil elektryczny
+
+Wariant większego modelu na życzenie użytkownika: Base domyślnie, Small i klasyczny wybierane jawnie z menu. Pełne informacje: docs/ai-base-073.md. Instalator pobiera i weryfikuje Base (347 MB), diagnostyka CLI używa Base. Runtime Windows py312-07 bez zmiany bibliotek. Definicja wzorca 8; profil electrical-takeoff-v1 rozróżnia jawne IP, EX i fazy; brak lub niejednoznaczność wymaga weryfikacji.
+
+Nie dotrenowano wag na prywatnych danych. Benchmark 3 zestawy × 3 tryby: każdy TP=2, FP=0, FN=0, review=1, other=2. Większy model nie poprawił tego już poprawnego wyniku. Base self-test 12/12 PASS i rzeczywisty przepływ GUI sprawdzony. Nadal potrzebne oryginalne PDF-y ze zdjęć i ręczne adnotacje; brak potwierdzenia jakości na laptopie służbowym.
+
+Weryfikacja końcowa: pełny przebieg 157 PASS / 5 błędów / 4 SKIP, następnie naprawa trzech limitów GUI i dwóch powodów decyzji oraz 43 PASS / 1 SKIP / 0 błędów w dotkniętych modułach. Łączne pokrycie po poprawkach: 162 przypadki zaliczone, cztery wymagają prywatnych PDF. Nie powtarzano całości. Końcowy Base CLI 12/12 PASS i GUI sprawdzone. Szczegóły w docs/ai-base-073.md.
+
+Poniższe sekcje są historią wcześniejszych wersji.
+
 # Aktualizacja 0.7.2 — poprawki po testach użytkownika
 
 Wprowadzono normalizację podzielonych prostych w ścieżkach PDF (definition_version=7), odzyskiwanie rastrowego symbolu z potwierdzoną w otoczeniu linią tła i czytelniejsze liczniki/filtr grup. Szczegóły i ograniczenia: docs/detection-072.md. Runtime Windows pozostaje py312-07; nie zmieniono przypiętych zależności ani modelu AI.

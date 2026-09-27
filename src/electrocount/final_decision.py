@@ -10,6 +10,10 @@ class FinalDecisionEngine:
         if not geometry_verified:return 'REJECTED',confidence,'geometry_not_verified'
         if expected and actual and actual!=expected:return 'OTHER_VARIANT',confidence,'different_device_label'
         if expected and not actual:return 'REVIEW',confidence,'missing_or_ambiguous_device_label'
-        if signals.get('visual_ai_score') is not None and confidence<.78:
+        # Color changes confidence, but monochrome/alternate-color copies cannot
+        # fail solely on color. Existing geometry and exact-text gates stay intact.
+        decision_weights={k:w for k,w in present.items() if k!='color_score'}
+        evidence=sum(signals[k]*w for k,w in decision_weights.items())/max(sum(decision_weights.values()),1e-9)
+        if signals.get('visual_ai_score') is not None and evidence<.78:
             return 'REVIEW',confidence,'insufficient_combined_evidence'
         return 'MATCH',confidence,'exact_device_label' if expected else 'symbol_geometry_verified'

@@ -33,19 +33,19 @@ def test_gui_native_templates_groups_save_reopen_under_auto(app,tmp_path,monkeyp
         window.set_mode('template');window.rectangle_selected([106,175,67,21])
         wait(app,lambda:len(window.project.groups)==1 and not window.loading)
         assert window.project.active_group().label=='QP14'
-        window.find_matches();wait(app,lambda:not window.busy)
+        window.find_matches();wait(app,lambda:not window.busy,timeout=180)
         assert len(window.project.detections)==4
         window.selected=window.project.detections[0].id
         window.decide('accepted')
         window.set_mode('template');window.rectangle_selected([106,455,55,21])
         wait(app,lambda:len(window.project.groups)==2 and not window.loading)
         assert window.project.active_group().label=='A1'
-        window.find_matches();wait(app,lambda:not window.busy)
+        window.find_matches();wait(app,lambda:not window.busy,timeout=180)
         assert len(window.project.detections)==12 and not window.conflicts
         assert sorted((g.label,sum(d.group==g.id for d in window.project.detections)) for g in window.project.groups)==[('A1',8),('QP14',4)]
         window.performance.set_mode('STANDARD')
         assert window.jobs.performance_plan['effective']=='DETERMINISTIC'
-        window.find_matches();wait(app,lambda:not window.busy)
+        window.find_matches();wait(app,lambda:not window.busy,timeout=180)
         assert len(window.project.detections)==12
         assert sum(d.decision=='accepted' for d in window.project.detections)==1
         window.folder=str(tmp_path/'gui-saved');assert window.save_project()

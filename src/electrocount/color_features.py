@@ -30,6 +30,9 @@ def color_signature(rgb):
     return {'confidence': float(min(1, len(pixels)/30)),
         'dominant_color': np.median(pixels,axis=0).round().astype(int).tolist(),
         'foreground_color': np.median(pixels,axis=0).round().astype(int).tolist(),
+        'mean_saturation': float(values[:,1].mean()/255),
+        'foreground_fraction': float(foreground.mean()),
+        'foreground_pixel_distribution': cv2.resize(foreground.astype(np.float32),(8,8),interpolation=cv2.INTER_AREA).ravel().tolist(),
         'hsv_distribution': hist.ravel().tolist(), 'saturation': float(np.median(values[:,1])/255),
         'hsv_statistics': {'mean': values.mean(axis=0).tolist(), 'std': values.std(axis=0).tolist()}}
 
@@ -40,9 +43,28 @@ def color_similarity(a, b):
     if min(a['saturation'], b['saturation']) < .12:
         # Color is uninformative across a monochrome conversion, not negative.
         return None
-    ha = np.array(a['hsv_distribution']).reshape(18,4)
-    hb = np.array(b['hsv_distribution']).reshape(18,4)
-    # Neighboring hue bins absorb small renderer/antialiasing differences.
-    ha = (ha*2 + np.roll(ha,1,axis=0) + np.roll(ha,-1,axis=0))/4
-    hb = (hb*2 + np.roll(hb,1,axis=0) + np.roll(hb,-1,axis=0))/4
-    return float(np.sqrt(ha*hb).sum())
+    # Compare hue distributions on chromatic foreground. PDF antialiasing blends
+    # a colored stroke with white and spreads saturation across several bins;
+    # requiring identical saturation bins incorrectly penalizes the same paint.
+    ha=np.array(a['hsv_distribution']).reshape(18,4)[:,1:].sum(axis=1)
+    hb=np.array(b['hsv_distribution']).reshape(18,4)[:,1:].sum(axis=1)
+    if not ha.sum() or not hb.sum():return None
+    ha/=ha.sum();hb/=hb.sum()
+    ha=(ha*2+np.roll(ha,1)+np.roll(ha,-1))/4
+    hb=(hb*2+np.roll(hb,1)+np.roll(hb,-1))/4
+    return float(np.clip(np.sqrt(ha*hb).sum(),0,1))
+
+
+
+def color_name(signature):
+    rgb=signature.get('dominant_color')
+    if rgb is None:return 'nieustalony'
+    h,s,v=cv2.cvtColor(np.array([[rgb]],dtype=np.uint8),cv2.COLOR_RGB2HSV)[0,0]
+    if s<35:return 'czarny / szary' if v<205 else 'biały'
+    if h<10 or h>=170:return 'czerwony'
+    if h<25:return 'pomarańczowy'
+    if h<40:return 'żółty'
+    if h<85:return 'zielony'
+    if h<100:return 'cyjan'
+    if h<135:return 'niebieski'
+    return 'magenta'
