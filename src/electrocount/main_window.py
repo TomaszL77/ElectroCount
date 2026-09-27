@@ -1001,7 +1001,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             if not d.group:
                 status = "BEZ PRZYPISANIA · " + status
             origin = "ręczny" if d.source == "manual" else f"kształt {d.graphic_score or d.score:.0%}"
-            rating_reason={'missing_electrical_rating':'brak wymaganego IP / EX / faz',
+            rating_reason={'partial_occlusion_review':'częściowo zasłonięty — sprawdź','missing_electrical_rating':'brak wymaganego IP / EX / faz',
                            'ambiguous_electrical_rating':'niejednoznaczne IP / EX / fazy'}.get(d.reason)
             if rating_reason:origin=rating_reason
             item = QListWidgetItem(f"{status} · {d.label or '?'} · {origin} | {d.page+1:02} · {self.project.pages[d.page]['name']}")

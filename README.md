@@ -1,4 +1,4 @@
-# ElectroCount 0.7.4 — symbol, kolor i oznaczenie
+# ElectroCount 0.7.5 — częściowo zasłonięte symbole
 
 Lokalna aplikacja Windows do zliczania konkretnego symbolu wybranego na rzucie albo w legendzie. Wzorzec łączy geometrię, kolor, oznaczenie i jego otoczenie. Program nie klasyfikuje automatycznie wszystkich instalacji.
 
@@ -8,6 +8,8 @@ Profil elektryczny rozróżnia jawne IP20/IP44, EX i 1~/3~. Brak wymaganego ozna
 
 
 **0.7.4:** osobny oryginał RGB i obraz dopasowania, kolorowy podgląd, kontekst tekstowy ze wszystkich stron oraz oddzielenie numeru urządzenia od opisów obwodów. Identyczne symbole 7 i 8 są rozdzielane; brak oznaczenia trafia do REVIEW i nie zwiększa licznika grupy. [Raport 0.7.4, punktacja i testy](docs/template-074.md).
+
+**0.7.5:** dodatkowa kontrola widocznych fragmentów odzyskuje lekko zasłonięte symbole do REVIEW. Nowe polecenie pozwala zastąpić wzorzec czystym przykładem w tej samej grupie. [Zmiany, wyniki i ograniczenia](docs/occlusion-075.md).
 
 ## Uruchomienie
 

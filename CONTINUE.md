@@ -1,3 +1,13 @@
+# Aktualizacja 0.7.5 — odzysk zasłoniętych symboli
+
+Nowy moduł occlusion.py: maski natywnego tekstu i cienkich linii potwierdzonych po obu stronach symbolu; zgodność widocznych fragmentów w obu kierunkach i min. 3 ćwiartkach; dodatkowe propozycje przy nierozpoznanych oznaczeniach PDF. Każdy odzysk to REVIEW bez przypisania i bez zwiększenia ilości. Nie odtwarzać ukrytych pikseli ani nie obniżać starych progów. Komenda Zliczanie → Wybierz czysty wzorzec tej grupy… wymienia wzorzec, unieważnia stare automatyczne wyniki i wspiera cofnięcie.
+
+Benchmark na identycznym syntetycznym PDF: 0.7.4 klasyczny — 1 MATCH, 0 REVIEW, 0 OTHER; 0.7.5 klasyczny/Small/Base — 1 MATCH, 2 REVIEW, 1 OTHER_VARIANT. Nadal nie odzyskuje dużego niewyjaśnionego ubytku. Większy model nie poprawił wyniku tego zestawu. Raport i odtwarzalny benchmark: docs/occlusion-075.md, tools/benchmark_occlusion_075.py.
+
+Pełna regresja: 182 PASS, 4 SKIP, 142,51 s. Cztery pominięcia dotyczą prywatnych dokumentów. Po pełnej regresji dodano tylko czytelny opis częściowego zasłonięcia na liście wyników; końcowy przepływ GUI sprawdzany ponownie. GUI: prawdziwe przeciągnięcie zaznaczenia, worker Base, zgodność z serwisem, zapis/odczyt projektu. Nie deklarować sprawdzenia instalacji Windows ani całych PDF ze służbowego laptopa.
+
+Poprzednie wersje poniżej.
+
 # Aktualizacja 0.7.4 — pełniejsza analiza wzorca
 
 Rozszerzenie istniejącego matchera: oryginalny RGB + osobny obraz dopasowania, wzorzec w definicji 9, kontekst i rotacja tekstu, role W:/O:/TP, odporniejszy histogram koloru, miękki sygnał koloru, osobne oceny i diagnostyka, kolorowy podgląd. REVIEW bez grupy nie zwiększa jej ilości. Aktualny raport: docs/template-074.md.
