@@ -1,4 +1,6 @@
-# ElectroCount 0.7.5 — częściowo zasłonięte symbole
+# ElectroCount 0.7.6 — wersja testowa
+
+**0.7.6:** poprawa 7–10 na sprawdzonym rzucie do 53/53; dokumenty CPP nadal wymagają poprawek. [Wyniki, ograniczenia i kolejność dalszych prac](docs/detection-076.md).
 
 Lokalna aplikacja Windows do zliczania konkretnego symbolu wybranego na rzucie albo w legendzie. Wzorzec łączy geometrię, kolor, oznaczenie i jego otoczenie. Program nie klasyfikuje automatycznie wszystkich instalacji.
 

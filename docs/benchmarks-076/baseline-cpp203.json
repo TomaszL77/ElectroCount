@@ -1,0 +1,64 @@
+{
+  "version": "0.7.5",
+  "pdf_sha256": "208e7dc0042923bed70689ec9ac2da0a35fc574f72212976581c14704f486bb7",
+  "suite": "cpp203",
+  "roi": [
+    50,
+    270,
+    600,
+    310
+  ],
+  "reference_centers": {
+    "AW4": [
+      [
+        146.4,
+        352.1
+      ],
+      [
+        322.0,
+        352.1
+      ],
+      [
+        519.6,
+        352.1
+      ],
+      [
+        146.4,
+        529.2
+      ],
+      [
+        322.0,
+        529.2
+      ],
+      [
+        519.6,
+        529.2
+      ]
+    ]
+  },
+  "threshold": 0.82,
+  "mode": "classic",
+  "results": [
+    {
+      "label": "AW4",
+      "recognized_template_label": "",
+      "selection": [
+        143.7,
+        349.8,
+        5.5,
+        5.5
+      ],
+      "seconds": 39.181,
+      "expected_in_audited_scope": 6,
+      "correct": 1,
+      "review_correct": 0,
+      "missed": 5,
+      "false_in_scope": 0,
+      "duplicates": 0,
+      "false_details": [],
+      "total_full_page_matches": 2,
+      "total_full_page_review": 0,
+      "full_page_matches_outside_audited_roi": 1
+    }
+  ]
+}

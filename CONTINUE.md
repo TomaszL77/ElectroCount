@@ -1,3 +1,7 @@
+# Aktualny etap: 0.7.6
+
+Gałąź feature/detection-0.7.6. Wyniki i ograniczenia: docs/detection-076.md. Powtarzalny benchmark: tools/benchmark_documents_076.py. Main nie został zmieniony. Nie przedstawiać 53/53 z jednego rzutu jako skuteczności na większości dokumentacji; CPP nadal ma duże pominięcia.
+
 # Aktualizacja 0.7.5 — odzysk zasłoniętych symboli
 
 Nowy moduł occlusion.py: maski natywnego tekstu i cienkich linii potwierdzonych po obu stronach symbolu; zgodność widocznych fragmentów w obu kierunkach i min. 3 ćwiartkach; dodatkowe propozycje przy nierozpoznanych oznaczeniach PDF. Każdy odzysk to REVIEW bez przypisania i bez zwiększenia ilości. Nie odtwarzać ukrytych pikseli ani nie obniżać starych progów. Komenda Zliczanie → Wybierz czysty wzorzec tej grupy… wymienia wzorzec, unieważnia stare automatyczne wyniki i wspiera cofnięcie.
