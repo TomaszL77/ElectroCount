@@ -20,7 +20,7 @@ class DetectionEngine:
     def find(self,path,page,template,label="",threshold=.82,progress=lambda p:None,template_path=None,status=lambda text:None):
         status("Odczyt tekstu i przygotowanie wzorca")
         source=template_path or path
-        if not template.get("text_aware") or (template.get("definition_version",0)<9 and
+        if not template.get("text_aware") or (template.get("definition_version",0)<10 and
                 template.get("selection_rect") and hasattr(self.pdf,"open_vector_page")):
             previous=template
             template=prepare_template(self.pdf,source,template['page'],template.get('selection_rect',template['rect']))
@@ -100,25 +100,26 @@ class DetectionEngine:
         progress(50)
         status("Weryfikacja cech i geometrii kandydatów")
         reference=None
+        reference_cache={}
         verified=[];rejected=[]
         for index,candidate in enumerate(proposals):
             if "verified" not in candidate:
-                if reference is None:
-                    reference=mask_text(self.pdf.render(source,template["page"],2.0,template.get("raster_rect",template["rect"])),
-                                        template_items,template.get("raster_rect",template["rect"]),2.0)
-                transformed=template_variant(cv2.cvtColor(reference,cv2.COLOR_RGB2GRAY),
-                    candidate.get("scale",1),candidate.get("raster_angle",candidate.get("rotation",0)))
-                patch=mask_text(self.pdf.render(path,page,2.0,candidate.get("verification_rect",candidate["rect"])),items,candidate.get("verification_rect",candidate["rect"]),2.0)
+                from .symbol_sampling import verification_images
+                transformed,patch,sampling,reference = verification_images(
+                    self.pdf,source,path,page,template,candidate,template_items,items,reference_cache)
+                candidate['verification_scale']=sampling
                 evidence={'verified':False,'geometry_score':0.,'feature_score':0.} if candidate.get('recovery_only') else self.features.verify(transformed,patch)
                 if not evidence['verified'] and hasattr(self.features,'verify_with_context') and evidence.get('reference_coverage',0)>=.99 and evidence.get('fill_consistent',True):
                     x,y,w,h=candidate.get('verification_rect',candidate['rect'])
                     meta=self.pdf.inspect(path)[page]
                     if x>=4 and y>=4 and x+w+4<=meta['width'] and y+h+4<=meta['height']:
                         context_box=[x-4,y-4,w+8,h+8]
-                        context=mask_text(self.pdf.render(path,page,2.,context_box),items,context_box,2.)
-                        evidence=self.features.verify_with_context(transformed,patch,context,8)
+                        context=mask_text(self.pdf.render(path,page,sampling,context_box),items,context_box,sampling)
+                        evidence=self.features.verify_with_context(transformed,patch,context,round(4*sampling))
                 candidate.update(evidence)
                 candidate["graphic_score"]=(candidate["score"]+evidence["feature_score"])/2
+                if candidate.get('source')=='label_geometry_probe' and evidence['verified']:
+                    candidate['graphic_score']=(evidence['geometry_score']+evidence['feature_score'])/2
             if not candidate['verified'] and not self.custom_matcher:
                 if reference is None:
                     reference=mask_text(self.pdf.render(source,template['page'],2.,template.get('raster_rect',template['rect'])),template_items,template.get('raster_rect',template['rect']),2.)
@@ -138,9 +139,7 @@ class DetectionEngine:
         # with spatial text evidence, without favoring the requested code.
         text_index=TextSpatialIndex(items)
         ocr=None
-        if self.encoder:
-            from .ocr_engine import OCREngine
-            ocr=OCREngine()
+
         for candidate in verified:
             layout=None if template.get('source')=='LEGEND' else template.get('association')
             options=[self.text.associate(candidate['rect'],text_index,
@@ -159,18 +158,23 @@ class DetectionEngine:
         if template.get('source')=='LEGEND':
             from .text_layout import resolve_repeated_layout
             resolve_repeated_layout(verified,self.text,text_index)
-        if ocr:
-            status('OCR: sprawdzanie kandydatów bez tekstu PDF')
-            for candidate in verified:
-                if not candidate['association_result']['item']:
-                    recognized=ocr.read_region(self.pdf,path,page,candidate['rect'],text_index.near(candidate['rect'],80))
-                    if recognized:
-                        candidate['association_result']=self.text.associate(candidate['rect'],recognized)
         candidates=[]
         for candidate in sorted(verified,key=lambda c:(not c.get("partial_occlusion",False),c["geometry_score"]+c["feature_score"]+
                 .2*c["association_result"]["score"]),reverse=True):
             if not any(overlap_metrics(candidate["rect"],other["rect"])[0]>.4 for other in candidates):
                 candidates.append(candidate)
+        # Resolve geometric duplicates before expensive OCR. OCR is independent
+        # of DINOv2; exact native associations never get overwritten.
+        if not self.custom_matcher and any(not c['association_result']['item'] for c in candidates):
+            from .ocr_engine import OCREngine
+            ocr=OCREngine()
+            status('OCR: sprawdzanie kandydatów bez tekstu PDF')
+            for candidate in candidates:
+                if candidate['association_result']['item']:continue
+                recognized=ocr.read_region(self.pdf,path,page,candidate['rect'],text_index.near(candidate['rect'],80))
+                if recognized:
+                    layout=None if template.get('source')=='LEGEND' else transformed_layout(template.get('association'),candidate.get('rotation',0),candidate.get('scale',1))
+                    candidate['association_result']=self.text.associate(candidate['rect'],recognized,layout)
         result={"matches":[],"review":[],"discovered_other_label":[],"label":expected,
                 "template":template,"coverage_warnings":warnings,"text_items":[i.to_dict() for i in items],
                 "rejected_candidates":rejected,

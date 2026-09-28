@@ -13,7 +13,7 @@ def label_proposals(template, expected, items, meta):
     layout=template.get('association')
     if not expected or not layout or not layout.get('offset') or template.get('source')=='LEGEND':return []
     w,h=template['rect'][2:]
-    if min(w,h)<5 or max(w,h)>150:return []
+    if min(w,h)<=0 or max(w,h)>150:return []
     result=[];seen=set()
     for item in items:
         if item.source!='pdf_native' or item.normalized_text!=expected:continue
@@ -31,7 +31,7 @@ def label_proposals(template, expected, items, meta):
                 if key in seen:continue
                 seen.add(key)
                 result.append(dict(rect=rect,verification_rect=rect,score=0.,scale=ratio,
-                    rotation=-angle,raster_angle=angle,source='label_occlusion_probe',recovery_only=True))
+                    rotation=-angle,raster_angle=angle,source='label_geometry_probe',recovery_only=(min(w,h)>=5 or min(w,h)/max(w,h)<.35)))
     return result
 
 
@@ -119,10 +119,10 @@ def visible_evidence(reference, candidate, unknown):
 
 def verify_partial(pdf,path,page,template,reference,candidate,items):
     box=candidate.get('verification_rect',candidate['rect']);x,y,w,h=box
-    if min(w,h)<5 or max(w,h)>150:return None
+    if min(w,h)<=0 or max(w,h)>150:return None
     angle=candidate.get('raster_angle',candidate.get('rotation',0))
     if abs(angle/90-round(angle/90))>.01:return None
-    scale=2.;meta=pdf.inspect(path)[page]
+    scale=candidate.get('verification_scale',2.);meta=pdf.inspect(path)[page]
     pixels=math.ceil(max(4.,min(w,h)*.35)*scale);pad=pixels/scale
     if x<pad or y<pad or x+w+pad>meta['width'] or y+h+pad>meta['height']:return None
     patch=pdf.render(path,page,scale,box)

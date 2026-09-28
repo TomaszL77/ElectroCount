@@ -22,14 +22,20 @@ class OCREngine:
         radius=max(24,max(w,h)*1.5)
         left,top=max(0,x-radius),max(0,y-radius)
         box=[left,top,min(meta['width'],x+w+radius)-left,min(meta['height'],y+h+radius)-top]
-        image=pdf.render(path,page,3.,box)
+        scale=min(12.,max(3.,40/max(min(w,h),1.)))
+        image=pdf.render(path,page,scale,box)
         output,_=self.backend(cv2.cvtColor(image,cv2.COLOR_RGB2BGR))
         result=[]
         for polygon,text,confidence in output or []:
             if confidence<.80:continue
-            points=np.asarray(polygon)/3+np.array([left,top])
+            points=np.asarray(polygon)/scale+np.array([left,top])
             start=points.min(axis=0);end=points.max(axis=0)
             bbox=[*start.tolist(),*(end-start).tolist()]
+            # Symbol strokes can themselves be read as X, (), or a numeral.
+            # Only surrounding OCR is promoted to a device code; native text
+            # inside a symbol remains available through the native path.
+            if intersection(rect,bbox)>.5*bbox[2]*bbox[3]:continue
+            if not any(c.isalnum() for c in text):continue
             if any(intersection(bbox,i.bbox)>.3*bbox[2]*bbox[3] for i in native_items):continue
             result.append(PdfTextItem(text,normalize_text(text),page,bbox,((start+end)/2).tolist(),
                 source='ocr',confidence=float(confidence),

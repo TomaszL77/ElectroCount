@@ -13,7 +13,7 @@ from .text_engine import prepare_template
 def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_context=None, ocr_enabled=False, model_name='small'):
     try:
         template = prepare_template(pdf, path, page, selection)
-        if ocr_enabled and not template.get('label'):
+        if not template.get('label') and (ocr_enabled or not pdf.extract_text(path,page)):
             from .ocr_engine import OCREngine,TextOverridePDF
             native=pdf.extract_text(path,page)
             recognized=OCREngine().read_region(pdf,path,page,template['rect'],native)

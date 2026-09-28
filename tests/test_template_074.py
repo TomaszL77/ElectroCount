@@ -158,7 +158,7 @@ def test_old_template_migrates_rgb_and_keeps_explicit_legend(tmp_path):
     old['representation'].pop('original_rgb_crop')
     r=run_detection(pdf,str(p),0,old)
     updated=r['template']
-    assert updated['definition_version']==9 and updated['source']=='LEGEND'
+    assert updated['definition_version']==10 and updated['source']=='LEGEND'
     assert updated['representation']['id']==identity and updated['representation']['group_id']=='group-7'
     assert 'original_rgb_crop' in updated['representation']
     assert not any(h['rect'][1]<100 for h in r['matches'])
