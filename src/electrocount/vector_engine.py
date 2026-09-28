@@ -89,7 +89,7 @@ def sample_segment(segment):
     return (1-t)*points[0]+t*points[-1]
 
 
-def intersections(segments):
+def intersections(segments, endpoint_tolerance=0.):
     lines=[s["points"] for s in segments if s["kind"]=="line"]
     count=0
     for i,(a,b) in enumerate(lines):
@@ -100,7 +100,9 @@ def intersections(segments):
             if abs(np.linalg.det(matrix))<1e-8:
                 continue
             u,v=np.linalg.solve(matrix,c-a)
-            if .01<u<.99 and .01<v<.99:
+            # CAD rounding can move outline contacts over short edge endpoints.
+            interior=min(u,1-u)*np.linalg.norm(b-a)>endpoint_tolerance and min(v,1-v)*np.linalg.norm(d-c)>endpoint_tolerance
+            if .01<u<.99 and .01<v<.99 and interior:
                 count+=1
     return count
 
@@ -161,8 +163,32 @@ def canonical_path(path):
     return {**path, 'segments':segments}
 
 
+def without_redundant_outlines(paths):
+    """Drop only a stroked circle coincident with an already painted boundary.
+
+    CAD may emit the same ring as a filled compound polygon plus an optional
+    Bezier stroke. Interior marks, separate circles and all filled paths remain.
+    """
+    kept=[]
+    for p in paths:
+        redundant=False
+        if not p.get('fill') and len(p['segments'])==4 and all(e['kind']=='curve' for e in p['segments']):
+            points=np.concatenate([sample_segment(e) for e in p['segments']])
+            for q in paths:
+                if q is p or not painted_fill(q) or len(q['segments'])<8 or len(q['segments'])>64:continue
+                if p.get('color')!=q.get('color'):continue
+                if not contains(q['bbox'],p['bbox'],.08):continue
+                if min(p['bbox'][2:])<.70*min(q['bbox'][2:]):continue
+                boundary=np.concatenate([sample_segment(e) for e in q['segments']])
+                distance=np.linalg.norm(points[:,None]-boundary[None,:],axis=2).min(axis=1)
+                if distance.max()<=.08:
+                    redundant=True;break
+        if not redundant:kept.append(p)
+    return kept
+
+
 def signature(paths):
-    paths=without_paint_caps([canonical_path(p) for p in paths])
+    paths=without_redundant_outlines(without_paint_caps([canonical_path(p) for p in paths]))
     segments=[s for p in paths for s in p["segments"]]
     if len(segments)<3 or len(segments)>512:
         return None
@@ -232,7 +258,7 @@ class VectorCandidateGenerator:
 
     def verify(self,reference,nearby,rotation,translation,box):
         from collections import Counter
-        nearby=without_paint_caps([canonical_path(p) for p in nearby])
+        nearby=without_redundant_outlines(without_paint_caps([canonical_path(p) for p in nearby]))
         # CAD backgrounds can leave a tiny spur inside an otherwise complete
         # device. The budget is geometric length, never a percentage of paths;
         # filled areas and missing reference features cannot use this tolerance.
@@ -280,10 +306,13 @@ class VectorCandidateGenerator:
             if not compatible:fill_mismatch=True;break
             unused.remove(min(compatible,key=lambda j:sum(abs(a-b) for a,b in zip(expected_box,filled_actual[j]['bbox']))))
         # CAD coordinates are often rounded to 0.12 pt. Allow that absolute
-        # quantization, while preserving the relative full-shape gate.
-        residual=max(0.,max(errors,default=1)-.12/diagonal)
+        # quantization in BOTH axes (Euclidean bound sqrt(2)*0.12),
+        # while preserving every stroke, paint and the relative full-shape gate.
+        residual=max(0.,max(errors,default=1)-math.sqrt(2)*.12/diagonal)
         geometry=math.exp(-25*residual)
-        consistent=geometry>=.88 and intersections(actual)==reference["intersections"]
+        transformed_ref=[{'kind':edge['kind'],'points':(np.asarray(edge['points'])@rotation.T+translation).tolist()} for edge in ref]
+        topology_ok=intersections(actual,.18)==intersections(transformed_ref,.18)
+        consistent=geometry>=.88 and topology_ok
         feature=ratio*(1.0 if kinds else .4)*(1.0 if consistent else .4)
         verified=feature>=.95 and geometry>=.88 and len(used_ref)==len(ref) and not fill_mismatch
         return {"graphic_score":(feature+geometry)/2,"feature_score":feature,"geometry_score":geometry,

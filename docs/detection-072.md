@@ -35,3 +35,4 @@ Pełna seria regresji: **149 PASS, 4 SKIP, 0 błędów (22,46 s)**. Wcześniejsz
 Testy odbyły się na Linux/Python 3.12 z Qt offscreen, PDFium, OpenCV CPU, prawdziwym OCR i modelem ONNX. Nie wykonano instalacji na laptopie służbowym ani testu jego sterowników/skalowania ekranu. Zrzuty z maila nie zawierają oryginalnej struktury PDF. Prywatne pliki CPP203, hala i pakiet użytkownika nie były dostępne; dotyczące ich testy mają jawne pominięcia.
 
 Nie potwierdzono poprawy konkretnych wyników ze zdjęć, pełnego rozróżniania EX ani poprawności wszystkich wariantów osprzętu. Ciężkie zasłonięcia, ukośne linie tła oraz inaczej podzielone krzywe/osobne obiekty mogą nadal powodować pominięcia. W Windows należy uruchomić Diagnostyka.cmd (oczekiwane 12/12), a następnie przeliczyć ten sam zapisany projekt na obu komputerach.
+

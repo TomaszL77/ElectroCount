@@ -1,14 +1,18 @@
 # ElectroCount — drugi komputer
 
-Kod i testy ElectroCount 0.7.2. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
+Kod i testy ElectroCount 0.7.5. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
 
-Po rozpakowaniu tej aktualizacji uruchamiaj **Uruchom.cmd z nowego folderu**. Stary skrót może uruchamiać wcześniejszy kod. W tytule okna ma być **0.7.2**. Jeśli runtime 0.7 już działa, możesz od razu uruchomić program; jeśli brakuje bibliotek, uruchom Instaluj.cmd. Otwórz projekt i ponownie kliknij Znajdź — zapisane wyniki nie przeliczają się same.
+Po rozpakowaniu tej aktualizacji uruchamiaj **Uruchom.cmd z nowego folderu**. Stary skrót może uruchamiać wcześniejszy kod. W tytule okna ma być **0.7.5**. Jeśli runtime 0.7 już działa, uruchom Instaluj_AI.cmd, aby pobrać większy model Base (347 MB), potem Uruchom.cmd. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Otwórz projekt i ponownie kliknij Znajdź — zapisane wyniki nie przeliczają się same.
 
 1. Zaloguj się do GitHuba na swoje konto. W GitHub Desktop wybierz File → Clone repository i repozytorium ElectroCount. Jeśli korzystasz z paczki ZIP, najpierw rozpakuj cały folder do lokalnego katalogu. Po pobraniu aktualizacji zamknij poprzednią aplikację, uruchom Instaluj.cmd i Uruchom.cmd.
 2. Zainstaluj Python 3.12 64-bit z python.org wraz z Python Launcher. Sprawdzenie: `py -3.12 --version`.
 3. Otwórz folder aplikacji i uruchom Instaluj.cmd. Potrzebny jest internet do pobrania bibliotek. Instalator pobiera również lokalne modele DINOv2 i OCR. Używa krótkiej ścieżki %LOCALAPPDATA%/ElectroCount/py312-07 i kończy testem PASS 12/12.
 4. Uruchom Uruchom.cmd. Otwórz lokalny PDF. Analiza używa tej samej jakości na każdym komputerze.
 5. W swoim narzędziu do pracy z kodem otwórz ten sam lokalny folder. Przeczytaj CONTINUE.md — opisuje dotychczasowe prace i następne kroki.
+
+## Zasłonięte symbole
+
+Nowo odzyskane elementy są widoczne jako **BEZ PRZYPISANIA** i nie zwiększają licznika grupy. Sprawdź je na rysunku i użyj **Przypisz do grupy**. Aby poprawić sam wzorzec, wybierz **Zliczanie → Wybierz czysty wzorzec tej grupy…**, zaznacz czysty przykład tego samego typu i ponownie kliknij **Znajdź**.
 
 ## Praca na dwóch komputerach
 
@@ -28,3 +32,16 @@ Lokalne przykłady wymienione w README mogą być nieobecne w paczce kodu. Testy
 
 Po instalacji, w katalogu aplikacji: **Testy.cmd**.
 Dodatkowo ustaw ELECTROCOUNT_TEST_HALA na ścieżkę PDF hali oraz ELECTROCOUNT_TEST_PACK na folder pakietu testowego. Bez tych plików testy rzeczywistych dokumentów są jawnie pomijane.
+
+
+## Większy model i oznaczenia elektryczne
+
+Domyślny model to AI Base. W menu Ustawienia → Model analizy możesz wybrać Base, Small albo klasyczny. Small wymaga jednorazowo `Instaluj_AI.cmd --model small`. Po instalacji analiza jest lokalna i nie potrzebuje internetu.
+
+Zaznacz cały symbol wraz z kodem typu i właściwymi oznaczeniami IP, EX lub faz. Program nie zakłada IP20, jeśli oznaczenia nie ma. Brak wymaganej cechy trafia do sprawdzenia; inny jawny wariant jest oddzielany. Zmiana numeru obwodu nie rozdziela tego samego typu urządzenia. Model nie był trenowany na Twoich prywatnych rysunkach.
+
+## Aktualizacja wzorców w 0.7.5
+
+Otwórz projekt w nowym folderze aplikacji i ponownie kliknij Znajdź. Starsze wzorce są odtwarzane w definicji 9, z RGB i kontekstem. Dla nowego wzorca wystarczy zaznaczyć cały symbol; pewne oznaczenie w pobliżu jest pobierane z PDF. Przy zatłoczonym rysunku zaznacz symbol wraz z właściwym oznaczeniem. Sprawdź odczytany numer w panelu przed zliczaniem.
+
+Licznik grupy pokazuje przypisane wyniki. Elementy bez pewnego numeru pozostają osobno jako „Bez przypisania”; inne numery są innymi wariantami. Sama nazwa grupy nie potwierdza poprawności wszystkich wyników.

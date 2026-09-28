@@ -13,6 +13,7 @@ from .performance import execution_plan
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--self-test', action='store_true')
+    parser.add_argument('--engine-mode', choices=['classic','hybrid','hybrid_base'], default='classic')
     parser.add_argument('--replay', type=Path)
     parser.add_argument('--pdf', help='New local path to the same document')
     parser.add_argument('--template-pdf', help='New local path if reference is from another document')
@@ -24,7 +25,7 @@ def main():
     plan=execution_plan('AUTO');cv2.setNumThreads(plan.cpu_threads)
     write_json(out/'runtime_info.json',runtime_info(probe_hardware=True))
     if args.self_test:
-        report=self_test(pdf,out,config=plan.to_dict())
+        report=self_test(pdf,out,config={**plan.to_dict(),'engine_mode':args.engine_mode,'neural_enabled':args.engine_mode!='classic'})
         print(json.dumps(report,ensure_ascii=True))
         return 0 if report['status']=='PASS' else 1
     if not args.replay:parser.error('Specify --self-test or --replay detection_log.json')

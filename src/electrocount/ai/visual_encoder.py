@@ -1,9 +1,10 @@
-"""Pinned DINOv2-small FP32 encoder; no downloads or hardware-based model selection."""
+"""Pinned DINOv2 Small/Base FP32 encoders; identical CPU policy on every PC."""
 from pathlib import Path
 import hashlib
 import numpy as np
 from PIL import Image
 from .contracts import VisualEmbedding, AIExecutionProvider
+from .model_catalog import MODELS
 
 MODEL_REVISION = '8b1f705a3a7f6f062f6bdd21986c1583d3ef105d'
 MODEL_SHA256 = 'f22797eabf810a75e41de68d378541ebea372122b25c4ce3ef25ff618250c20a'
@@ -13,13 +14,18 @@ class DinoV2Encoder:
     name = 'dinov2-small-onnx-fp32'
     version = MODEL_REVISION
 
-    def __init__(self, path=None):
-        path = Path(path) if path else Path(__file__).resolve().parents[3]/'models/dinov2-small/8b1f705/model.onnx'
+    def __init__(self, path=None, model_name='small'):
+        spec=MODELS[model_name]
+        self.name=f'dinov2-{model_name}-onnx-fp32'
+        self.version=spec.revision
+        self.dimensions=spec.dimensions
+        self.model_key=model_name
+        path = Path(path) if path else Path(__file__).resolve().parents[3]/'models'/spec.relative_path
         if not path.is_file():
-            raise RuntimeError('Brak modelu DINOv2. Uruchom Instaluj_AI.cmd. Nie zmieniono silnika automatycznie.')
+            raise RuntimeError(f'Brak modelu DINOv2 {model_name}. Uruchom Instaluj_AI.cmd. Wybrany model nie został zastąpiony.')
         with path.open('rb') as stream:
             checksum=hashlib.file_digest(stream,'sha256').hexdigest()
-        if checksum != MODEL_SHA256:
+        if checksum != spec.sha256:
             raise RuntimeError('Nieprawidłowa suma kontrolna DINOv2. Uruchom Instaluj_AI.cmd.')
         from collections import OrderedDict
         self.cache=OrderedDict()
@@ -31,6 +37,7 @@ class DinoV2Encoder:
         options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_BASIC
         options.add_session_config_entry('session.use_deterministic_compute','1')
         self.session = ort.InferenceSession(str(path),sess_options=options,providers=['CPUExecutionProvider'])
+        self.output_name=self.session.get_outputs()[0].name
 
     @staticmethod
     def preprocess(crop):
@@ -51,7 +58,10 @@ class DinoV2Encoder:
         pixels=self.preprocess(crop)
         key=hashlib.sha256(pixels.tobytes()).digest()
         if key not in self.cache:
-            self.cache[key]=self.session.run(None,{'pixel_values':pixels})[0][0]
+            result=self.session.run([self.output_name],{'pixel_values':pixels})[0][0]
+            if result.shape!=(257,self.dimensions) or not np.isfinite(result).all():
+                raise RuntimeError('Nieprawidłowy kształt lub wartości wyjścia modelu DINOv2.')
+            self.cache[key]=result
             while len(self.cache)>32:self.cache.popitem(last=False)
         self.cache.move_to_end(key)
         return self.cache[key]
@@ -63,4 +73,7 @@ class DinoV2Encoder:
 
 
 def cosine(a,b):
+    if (a.model_name,a.model_version)!=(b.model_name,b.model_version):
+        raise ValueError('Nie można porównywać wektorów pochodzących z różnych modeli.')
     return float(np.clip(np.dot(a.values,b.values),0,1))
+

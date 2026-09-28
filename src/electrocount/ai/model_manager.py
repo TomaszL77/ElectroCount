@@ -4,7 +4,14 @@ from pathlib import Path
 import hashlib
 import json
 import re
+from functools import lru_cache
 from .contracts import AIExecutionProvider
+
+
+@lru_cache(maxsize=2)
+def _encoder(path, size, modified, model_name):
+    from .visual_encoder import DinoV2Encoder
+    return DinoV2Encoder(path,model_name=model_name)
 
 
 @dataclass(frozen=True)
@@ -39,9 +46,13 @@ class ModelManager:
     def __init__(self, directory):
         self.directory = Path(directory).resolve()
 
-    def load_visual_encoder(self):
+    def load_visual_encoder(self, model_name='small'):
+        from .model_catalog import MODELS
         from .visual_encoder import DinoV2Encoder
-        return DinoV2Encoder(self.directory/'dinov2-small/8b1f705/model.onnx')
+        path=self.directory/MODELS[model_name].relative_path
+        if not path.is_file():return DinoV2Encoder(path,model_name=model_name)
+        stat=path.stat()
+        return _encoder(str(path),stat.st_size,stat.st_mtime_ns,model_name)
 
     def _manifests(self):
         records = []
@@ -84,3 +95,4 @@ class ModelManager:
         valid = digest.hexdigest() == manifest.checksum.lower()
         return {"status":"verified" if valid else "checksum_mismatch","active":False,
                 "manifest":manifest,"path":str(path)}
+

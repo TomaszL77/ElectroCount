@@ -18,6 +18,7 @@ class PdfTextItem:
 
     source: str = "pdf_native"
     confidence: float = 1.0
+    rotation: float = 0.0
 
     def to_dict(self):
         return asdict(self)
@@ -144,21 +145,27 @@ def prepare_template(engine, path, page, selection):
         rect = [selection[0]+x0/scale, selection[1]+y0/scale, (x1-x0)/scale, (y1-y0)/scale]
     selected=[i for i in items if intersection(selection,i.bbox)>.8*i.bbox[2]*i.bbox[3]]
     # An explicitly selected, larger label wins over tiny circuit annotations.
-    selected.sort(key=lambda i:min(i.bbox[2:]),reverse=True)
+    from .text_roles import TextRoleClassifier
+    selected_labels=[i for i in selected if TextRoleClassifier().classify(i.normalized_text)[0]=='DEVICE_LABEL']
+    selected_labels.sort(key=lambda i:min(i.bbox[2:]),reverse=True)
     unique=[]
-    for item in selected:
+    for item in selected_labels:
         if not any(item.normalized_text==i.normalized_text and item.bbox==i.bbox for i in unique):unique.append(item)
     if unique and (len(unique)==1 or min(unique[0].bbox[2:])>1.6*min(unique[1].bbox[2:])):
         association=TextEngine().associate(rect,unique[:1])
     else:
-        association=TextEngine().associate(rect,selected or items)
+        association=TextEngine().associate(rect,selected_labels or items)
+    # Keep all contextual evidence even when the selection explicitly picks a label.
+    association['associated_texts']=TextEngine().associate(rect,items).get('associated_texts',[])
     item = association["item"]
     raster_rect=rect
     if min(rect[2:])<3:
         meta=engine.inspect(path)[page];x,y,w,h=rect
         left,top=max(0,x-3),max(0,y-3)
         raster_rect=[left,top,min(meta["width"],x+w+3)-left,min(meta["height"],y+h+3)-top]
+    from .electrical_profile import build_profile
     return {"source": "LEGEND" if signature and signature.get('source_legend') else "DRAWING",
+            "electrical_profile":build_profile(rect,selected),
             "associated_texts":association.get('associated_texts',[]),
             "text_role_confidence":association.get('text_role_confidence',0),
             "page": page, "raster_rect":raster_rect, "selection_rect": selection, "rect": rect, "signature": signature,
@@ -167,7 +174,7 @@ def prepare_template(engine, path, page, selection):
             "label_item": item.to_dict() if item else None,
             "spatial_association_score": association["score"],
             "reason": association["reason"], "text_aware": True,
-            "definition_version": 7, "geometry_source": "native_local" if signature else "raster",
+            "definition_version": 10, "geometry_source": "native_local" if signature else "raster",
             "text_bbox":item.bbox if item else None,
             "self_check":bool(signature),
             "possible_label": (association.get("alternatives") or [{}])[0].get("normalized_text", "")}

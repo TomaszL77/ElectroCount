@@ -1,0 +1,1223 @@
+{
+  "7": {
+    "matches": [
+      {
+        "rect": [
+          1018.4,
+          885.96,
+          4.800000000000068,
+          4.67999999999995
+        ],
+        "label": "7",
+        "label_bbox": [
+          1019.999,
+          880.855,
+          2.756999999999948,
+          4.264999999999986
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9846712252556297,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1018.4,
+          750.24,
+          4.800000000000068,
+          4.67999999999995
+        ],
+        "label": "7",
+        "label_bbox": [
+          1019.999,
+          745.135,
+          2.756999999999948,
+          4.264999999999986
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9846712252556297,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          515.7199999999999,
+          634.9200000000001,
+          4.800000000000068,
+          4.67999999999995
+        ],
+        "label": "7",
+        "label_bbox": [
+          517.319,
+          629.815,
+          2.757000000000062,
+          4.264999999999986
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9846712252556289,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          583.64,
+          635.1600000000001,
+          4.800000000000182,
+          4.680000000000064
+        ],
+        "label": "7",
+        "label_bbox": [
+          585.239,
+          630.055,
+          2.756999999999948,
+          4.2650000000001
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9846712252556286,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1018.52,
+          817.8,
+          4.800000000000182,
+          4.680000000000064
+        ],
+        "label": "7",
+        "label_bbox": [
+          1020.119,
+          812.695,
+          2.756999999999948,
+          4.264999999999986
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9846712252556268,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1199.6,
+          655.5600000000001,
+          4.800000000000182,
+          4.67999999999995
+        ],
+        "label": "7",
+        "label_bbox": [
+          1201.199,
+          650.455,
+          2.7569999999998345,
+          4.264999999999986
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9846712252556268,
+        "verification_method": "native_connected_geometry"
+      },
+      {
+        "rect": [
+          1114.52,
+          621.6000000000001,
+          4.800000000000182,
+          4.67999999999995
+        ],
+        "label": "7",
+        "label_bbox": [
+          1116.119,
+          616.495,
+          2.757000000000062,
+          4.264999999999986
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9846712252556266,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          447.79999999999995,
+          634.6800000000001,
+          4.800000000000068,
+          4.67999999999995
+        ],
+        "label": "7",
+        "label_bbox": [
+          449.4,
+          629.575,
+          2.7560000000000286,
+          4.264999999999986
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.984657801092399,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1199.2399999999998,
+          621.8399999999999,
+          4.800000000000182,
+          4.67999999999995
+        ],
+        "label": "7",
+        "label_bbox": [
+          1200.839,
+          616.615,
+          2.757000000000062,
+          4.264999999999986
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.983420741126236,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1114.2799999999997,
+          655.6799999999998,
+          4.800000000000182,
+          4.67999999999995
+        ],
+        "label": "7",
+        "label_bbox": [
+          1115.879,
+          650.455,
+          2.7560000000000855,
+          4.264999999999986
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9834150829318236,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1907.48,
+          288.72,
+          4.800000000000182,
+          4.67999999999995
+        ],
+        "label": "7",
+        "label_bbox": [
+          1909.079,
+          283.494,
+          2.758000000000038,
+          4.265999999999963
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9834077076160828,
+        "verification_method": "vector_signature"
+      }
+    ],
+    "review": [],
+    "other_variant_count": 49
+  },
+  "8": {
+    "matches": [
+      {
+        "rect": [
+          1020.8,
+          621.96,
+          4.920000000000073,
+          4.67999999999995
+        ],
+        "label": "8",
+        "label_bbox": [
+          1021.764,
+          616.544,
+          2.796999999999912,
+          4.401000000000067
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9858995538383762,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          918.8,
+          571.8,
+          4.920000000000073,
+          4.680000000000064
+        ],
+        "label": "8",
+        "label_bbox": [
+          919.764,
+          566.384,
+          2.7970000000000255,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9858995538383745,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1018.16,
+          290.52000000000004,
+          4.920000000000073,
+          4.67999999999995
+        ],
+        "label": "8",
+        "label_bbox": [
+          1019.124,
+          285.104,
+          2.7970000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9858995538383741,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          439.7600000000002,
+          505.56000000000006,
+          4.919999999999845,
+          4.679999999999836
+        ],
+        "label": "8",
+        "label_bbox": [
+          440.724,
+          500.144,
+          2.7970000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9858995538383717,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1019.0000000000002,
+          374.7600000000001,
+          4.919999999999845,
+          4.679999999999836
+        ],
+        "label": "8",
+        "label_bbox": [
+          1019.964,
+          369.344,
+          2.797999999999888,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9858890235653739,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          950.2400000000001,
+          373.56000000000006,
+          4.919999999999845,
+          4.679999999999836
+        ],
+        "label": "8",
+        "label_bbox": [
+          951.204,
+          368.144,
+          2.798000000000002,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9858890235653722,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          950.4800000000001,
+          205.08000000000004,
+          4.919999999999845,
+          4.679999999999836
+        ],
+        "label": "8",
+        "label_bbox": [
+          951.444,
+          199.664,
+          2.798000000000002,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9858890235653722,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          848.72,
+          375.84000000000015,
+          4.919999999999845,
+          4.679999999999723
+        ],
+        "label": "8",
+        "label_bbox": [
+          849.684,
+          370.424,
+          2.798000000000002,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9858890235653714,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          952.8199999999999,
+          621.96,
+          4.919999999999959,
+          4.67999999999995
+        ],
+        "label": "8",
+        "label_bbox": [
+          953.844,
+          616.544,
+          2.796999999999912,
+          4.401000000000067
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9855095052959859,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          950.5400000000002,
+          290.28,
+          4.919999999999959,
+          4.67999999999995
+        ],
+        "label": "8",
+        "label_bbox": [
+          951.564,
+          284.864,
+          2.798000000000002,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.985499157002426,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1907.42,
+          329.6400000000001,
+          4.920000000000073,
+          4.67999999999995
+        ],
+        "label": "8",
+        "label_bbox": [
+          1908.444,
+          324.222,
+          2.798999999999978,
+          4.40300000000002
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9854887376047339,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1018.8199999999999,
+          204.9000000000001,
+          4.920000000000073,
+          4.67999999999995
+        ],
+        "label": "8",
+        "label_bbox": [
+          1019.844,
+          199.424,
+          2.796999999999912,
+          4.400999999999982
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9852272181085686,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1003.9399999999999,
+          571.3200000000002,
+          4.920000000000073,
+          4.67999999999995
+        ],
+        "label": "8",
+        "label_bbox": [
+          1004.844,
+          565.904,
+          2.796999999999912,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9851578545445581,
+        "verification_method": "vector_signature"
+      }
+    ],
+    "review": [],
+    "other_variant_count": 47
+  },
+  "9": {
+    "matches": [
+      {
+        "rect": [
+          903.08,
+          524.64,
+          4.7999999999999545,
+          4.680000000000064
+        ],
+        "label": "9",
+        "label_bbox": [
+          903.93,
+          518.984,
+          2.7910000000000537,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9855164216291937,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1039.1599999999999,
+          523.9199999999998,
+          4.7999999999999545,
+          4.680000000000064
+        ],
+        "label": "9",
+        "label_bbox": [
+          1040.01,
+          518.264,
+          2.79099999999994,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9855164216291918,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1039.52,
+          437.64,
+          4.7999999999999545,
+          4.680000000000064
+        ],
+        "label": "9",
+        "label_bbox": [
+          1040.37,
+          431.984,
+          2.7910000000001673,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9855164216291917,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          902.48,
+          473.52,
+          4.7999999999999545,
+          4.680000000000064
+        ],
+        "label": "9",
+        "label_bbox": [
+          903.33,
+          467.864,
+          2.7919999999999163,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9855058225326581,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1907.48,
+          350.52,
+          4.800000000000182,
+          4.680000000000064
+        ],
+        "label": "9",
+        "label_bbox": [
+          1908.33,
+          344.862,
+          2.79300000000012,
+          4.402999999999963
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9854911710818032,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1116.8000000000002,
+          419.04000000000025,
+          4.799999999999727,
+          4.679999999999836
+        ],
+        "label": "9",
+        "label_bbox": [
+          1117.77,
+          413.384,
+          2.79099999999994,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 0.9999999999997382,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.984729367855322,
+        "verification_method": "vector_signature"
+      }
+    ],
+    "review": [],
+    "other_variant_count": 54
+  },
+  "10": {
+    "matches": [
+      {
+        "rect": [
+          886.28,
+          440.88,
+          4.800000000000068,
+          4.680000000000064
+        ],
+        "label": "10",
+        "label_bbox": [
+          885.728,
+          434.864,
+          5.6720000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853757064266051,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          988.6399999999999,
+          490.55999999999995,
+          4.800000000000068,
+          4.680000000000064
+        ],
+        "label": "10",
+        "label_bbox": [
+          988.088,
+          484.544,
+          5.6720000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853757064266039,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1132.16,
+          557.28,
+          4.7999999999999545,
+          4.67999999999995
+        ],
+        "label": "10",
+        "label_bbox": [
+          1131.608,
+          551.264,
+          5.6720000000000255,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853757064266039,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          955.28,
+          538.8,
+          4.800000000000068,
+          4.680000000000064
+        ],
+        "label": "10",
+        "label_bbox": [
+          954.728,
+          532.784,
+          5.6720000000000255,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853757064266037,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          971.12,
+          456.72,
+          4.7999999999999545,
+          4.67999999999995
+        ],
+        "label": "10",
+        "label_bbox": [
+          970.568,
+          450.704,
+          5.6720000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853757064266037,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          971.0,
+          423.72,
+          4.7999999999999545,
+          4.67999999999995
+        ],
+        "label": "10",
+        "label_bbox": [
+          970.448,
+          417.704,
+          5.6720000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853757064266037,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1202.48,
+          422.0400000000001,
+          4.800000000000182,
+          4.680000000000007
+        ],
+        "label": "10",
+        "label_bbox": [
+          1201.928,
+          416.024,
+          5.671999999999798,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853757064266032,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1208.36,
+          490.56,
+          4.7999999999999545,
+          4.680000000000064
+        ],
+        "label": "10",
+        "label_bbox": [
+          1207.808,
+          484.544,
+          5.6720000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853757064266025,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          560.0,
+          559.4399999999998,
+          4.800000000000296,
+          4.680000000000291
+        ],
+        "label": "10",
+        "label_bbox": [
+          559.448,
+          553.424,
+          5.6720000000000255,
+          4.401000000000067
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853757064266008,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          491.36000000000024,
+          559.4399999999999,
+          4.7999999999999545,
+          4.67999999999995
+        ],
+        "label": "10",
+        "label_bbox": [
+          490.808,
+          553.424,
+          5.673000000000002,
+          4.401000000000067
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853721268698618,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1167.9199999999996,
+          420.7199999999998,
+          4.800000000000409,
+          4.680000000000234
+        ],
+        "label": "10",
+        "label_bbox": [
+          1167.367,
+          414.704,
+          5.673000000000002,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853695870789485,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1907.48,
+          370.43999999999994,
+          4.800000000000182,
+          4.680000000000007
+        ],
+        "label": "10",
+        "label_bbox": [
+          1906.928,
+          364.422,
+          5.6749999999999545,
+          4.402999999999963
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9853529199495054,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          477.4096202531646,
+          506.19037974683545,
+          4.860759493670912,
+          4.739240506329168
+        ],
+        "label": "10",
+        "label_bbox": [
+          476.888,
+          500.144,
+          5.6720000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9849261021868676,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          559.0696202531644,
+          506.4903797468354,
+          4.860759493671026,
+          4.7392405063292244
+        ],
+        "label": "10",
+        "label_bbox": [
+          558.488,
+          500.384,
+          5.671999999999912,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9842119054266955,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1132.04,
+          506.4,
+          4.800000000000182,
+          4.680000000000007
+        ],
+        "label": "10",
+        "label_bbox": [
+          1131.488,
+          500.264,
+          5.6720000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9841252222972127,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1099.6399999999999,
+          506.64,
+          4.800000000000182,
+          4.680000000000007
+        ],
+        "label": "10",
+        "label_bbox": [
+          1099.088,
+          500.504,
+          5.6720000000000255,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9841252222972123,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          594.4399999999999,
+          560.04,
+          4.800000000000068,
+          4.680000000000064
+        ],
+        "label": "10",
+        "label_bbox": [
+          593.888,
+          553.904,
+          5.671999999999912,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9841252222972102,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          509.8399999999999,
+          560.04,
+          4.800000000000068,
+          4.680000000000064
+        ],
+        "label": "10",
+        "label_bbox": [
+          509.288,
+          553.904,
+          5.6720000000000255,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9841252222972101,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          920.0,
+          439.91999999999996,
+          4.7999999999999545,
+          4.680000000000007
+        ],
+        "label": "10",
+        "label_bbox": [
+          919.448,
+          433.784,
+          5.6720000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.98412522229721,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1100.12,
+          557.76,
+          4.800000000000182,
+          4.680000000000177
+        ],
+        "label": "10",
+        "label_bbox": [
+          1099.568,
+          551.624,
+          5.6720000000000255,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9841252222972097,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1158.1999999999998,
+          490.91999999999996,
+          4.800000000000182,
+          4.680000000000007
+        ],
+        "label": "10",
+        "label_bbox": [
+          1157.528,
+          484.904,
+          5.6720000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9839265378601291,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1132.1599999999999,
+          455.39999999999986,
+          4.800000000000182,
+          4.680000000000234
+        ],
+        "label": "10",
+        "label_bbox": [
+          1131.488,
+          449.384,
+          5.6720000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9839265378601285,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          508.5199999999999,
+          507.8399999999999,
+          4.800000000000011,
+          4.680000000000064
+        ],
+        "label": "10",
+        "label_bbox": [
+          507.848,
+          501.824,
+          5.671999999999969,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9839265378601278,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          594.44,
+          506.52,
+          4.7999999999999545,
+          4.680000000000007
+        ],
+        "label": "10",
+        "label_bbox": [
+          593.768,
+          500.504,
+          5.6720000000000255,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9839265378601277,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1100.0,
+          455.4,
+          4.800000000000182,
+          4.680000000000007
+        ],
+        "label": "10",
+        "label_bbox": [
+          1099.328,
+          449.384,
+          5.6720000000000255,
+          4.4010000000000105
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9839265378601263,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1201.6399999999999,
+          557.8800000000001,
+          4.800000000000182,
+          4.679999999999836
+        ],
+        "label": "10",
+        "label_bbox": [
+          1200.968,
+          551.744,
+          5.6720000000000255,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9833648201877225,
+        "verification_method": "vector_signature"
+      },
+      {
+        "rect": [
+          1167.92,
+          558.0,
+          4.800000000000182,
+          4.679999999999836
+        ],
+        "label": "10",
+        "label_bbox": [
+          1167.247,
+          551.864,
+          5.673000000000002,
+          4.400999999999954
+        ],
+        "status": "MATCH",
+        "shape_score": 1.0,
+        "color_score": 1.0,
+        "label_score": 1.0,
+        "confidence": 0.9833604476946626,
+        "verification_method": "vector_signature"
+      }
+    ],
+    "review": [],
+    "other_variant_count": 33
+  }
+}

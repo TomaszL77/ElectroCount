@@ -361,6 +361,24 @@ class NativeVectorPage:
 
 
 def native_transforms(anchor,path,scale_range=(.80,1.25)):
+    # Fit cardinal transforms to complete bounds before short-edge hypotheses.
+    # Tiny polygonal circles/outlined glyphs have quantized short chords, which
+    # are poor rotation estimators. Every hypothesis still needs full verification.
+    aw,ah=anchor['bbox'][2:];bw,bh=path['bbox'][2:]
+    if min(aw,ah,bw,bh)>.1:
+        ac=np.array(anchor['bbox'][:2])+np.array([aw,ah])/2
+        bc=np.array(path['bbox'][:2])+np.array([bw,bh])/2
+        for angle in (0,90,180,270):
+            rw,rh=(ah,aw) if angle%180 else (aw,ah)
+            scale=(bw+bh)/(rw+rh)
+            if not scale_range[0]<=scale<=scale_range[1]:continue
+            if max(abs(rw*scale-bw),abs(rh*scale-bh))>max(.15,.025*max(bw,bh)):continue
+            rad=math.radians(angle)
+            rotation=np.array([[math.cos(rad),-math.sin(rad)],[math.sin(rad),math.cos(rad)]])*scale
+            yield rotation,bc-rotation@ac,float(scale),float(angle)
+            if max(abs(rw-bw),abs(rh-bh))<=.15 and abs(scale-1)>.0001 and scale_range[0]<=1<=scale_range[1]:
+                rigid=rotation/scale
+                yield rigid,bc-rigid@ac,1.,float(angle)
     # A circular anchor has no privileged quarter-curve chord. PDF rounding
     # can tilt that chord and shift the far end of an elongated device.
     if all(len(p['segments'])==4 and all(e['kind']=='curve' for e in p['segments']) and
