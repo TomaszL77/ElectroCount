@@ -22,6 +22,10 @@ CPP204: obszar [680,595,480,220] punktów PDF; 8 AW3 i 2 EW3. CPP203: [50,270,60
 
 Oznaczenia wzorców 7, 8, 9 i 10 odczytano z PDF; AW3, EW3 i AW4 przez OCR. W bazowej wersji Classic etykiety trzech wzorców CPP były puste. Oryginalne RGB jest zachowane.
 
+## Kontrola większego modelu
+
+Dla oprawy 7 model Base uzyskał 10/10 prawidłowych trafień i 1 wpis legendy, tak samo jak Classic. Nie poprawił skuteczności tego przypadku. Zarejestrowano około 189 s dla Base i 39 s dla Classic, ale procesy testowe działały współbieżnie, więc nie jest to kontrolowany benchmark wydajności. Nie wykonano pełnego porównania Base dla pozostałych typów.
+
 ## Co zmieniono
 
 1. Liczenie przecięć pomija niestabilne kontakty przy końcach odcinków, ale nadal sprawdza właściwe przecięcia wewnętrzne. Kontrola liczby i rodzaju kresek, brakujących cech oraz wypełnienia pozostaje. W starym detektorze oprawa o geometry score=1.0 mogła zostać odrzucona przez 1/3/5 pozornych przecięć.
