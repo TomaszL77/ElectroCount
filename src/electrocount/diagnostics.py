@@ -130,49 +130,16 @@ class RenderRecorder:
 
 
 def export_images(directory, pdf, path, page_index, template, result=None, template_path=None):
-    """Context renders are explicitly distinct from vector/raster matcher inputs."""
-    import cv2
-    import numpy as np
-    import pypdfium2 as pdfium
-    from .text_engine import mask_text
-    directory = Path(directory)
-    directory.mkdir(parents=True, exist_ok=True)
-    source = template_path or path
-    box = template.get("raster_rect", template["rect"])
-    raw = pdf.render(source, template["page"], 2.0, box)
-    def save(name, array):
-        cv2.imencode('.png', cv2.cvtColor(array, cv2.COLOR_RGB2BGR))[1].tofile(str(directory/name))
-    save('template_crop.png', raw)
-    save('template_masked.png', mask_text(raw, pdf.extract_text(source, template['page']), box, 2.0))
-    if template.get('selection_rect'):
-        save('selection_crop.png', pdf.render(source, template['page'], 2.0, template['selection_rect']))
-    meta = pdf.inspect(path)[page_index]
-    overview_scale = min(2.0, 2500/max(meta['width'], meta['height']))
-    save('page_render.png', pdf.render(path, page_index, overview_scale))
-    info = {'template_size': [raw.shape[1], raw.shape[0]], 'template_render_bbox': box,
-        'render_scale': 2.0, 'render_dpi': 144, 'page_render_scale': overview_scale,
-        'page_render_role': 'context_preview; native geometry has no bitmap input; actual raster calls are in renders/',
-        'candidates': []}
-    if result:
-        with pdfium.PdfDocument(path) as doc:
-            page = doc[page_index]
-            width,height = page.get_size()
-            count = 0
-            for bucket in ('matches', 'legend_matches', 'review', 'discovered_other_label', 'rejected_candidates'):
-                for hit in result.get(bucket, []):
-                    if not hit.get('rect'):continue
-                    count += 1
-                    x,y,w,h = hit['rect']
-                    x0,y0 = max(0,x-8),max(0,y-8)
-                    right,bottom = min(width,x+w+8),min(height,y+h+8)
-                    entry = {'index': count, 'bucket': bucket, **hit}
-                    if count <= 2000 and right>x0 and bottom>y0:
-                        scale = min(2.0, 800/max(right-x0,bottom-y0))
-                        bitmap = page.render(scale=scale,crop=(x0,height-bottom,width-right,y0),rev_byteorder=True)
-                        array = np.array(bitmap.to_numpy(),copy=True)[:,:,:3];bitmap.close()
-                        name = f'candidate_{count:03}.png';save(name,array)
-                        entry.update(file=name, crop_pdf=[x0,y0,right-x0,bottom-y0], render_scale=scale)
-                    else:entry['not_saved']='candidate_png_limit_2000'
-                    info['candidates'].append(entry)
-            page.close()
+    """Only the two template crops and a small extraction record."""
+    import base64
+    from .template_representation import build_representation
+    directory=Path(directory);directory.mkdir(parents=True,exist_ok=True)
+    representation=template.get('representation') or build_representation(
+        pdf,template_path or path,template['page'],template)
+    for filename,key in [('selection_crop.png','original_rgb_crop'),('matching_crop.png','visual_crop')]:
+        (directory/filename).write_bytes(base64.b64decode(representation[key]['png_base64']))
+    info={k:template.get(k) for k in ('selection_bbox','symbol_bbox','matching_bbox','source',
+          'extraction_mode','preserved_paths','removed_paths')}
+    info['detected_label']=template.get('label','')
+    write_json(directory/'template_log.json',info)
     return info

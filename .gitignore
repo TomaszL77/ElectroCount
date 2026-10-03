@@ -21,7 +21,9 @@ docs/*.png
 docs/*.json
 docs/*.xml
 
-!tests/fixtures/*.pdf
+tests/fixtures/
+docs/benchmarks*/
+**/pdf-cache/
 
 .runtime-path
 debug/

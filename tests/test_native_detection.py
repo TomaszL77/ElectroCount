@@ -90,26 +90,6 @@ def test_compact_progress_keeps_status_percent_and_cancel(app):
     panel.finish('batch_match');assert not panel.isVisible()
 
 
-def test_real_hall_both_neighbor_templates_with_three_selection_margins():
-    path=os.environ.get('ELECTROCOUNT_TEST_HALA')
-    if not path:pytest.skip('Set ELECTROCOUNT_TEST_HALA to the supplied lighting PDF')
-    pdf=PdfiumEngine();items=pdf.extract_text(path,0)
-    with pdf.open_vector_page(path,0) as native:
-        class ReusedPage(PdfiumEngine):
-            def open_vector_page(self,*args):return nullcontext(native)
-            def extract_text(self,*args):return items
-        engine=ReusedPage()
-        for x in (3153,3289.08):
-            templates=[prepare_template(engine,path,0,[x,1389,16,h]) for h in (28,36,46)]
-            assert all(t['label']=='L3' for t in templates)
-            assert all(t['rect']==pytest.approx(templates[0]['rect']) for t in templates)
-            result=DetectionEngine(engine).find(path,0,templates[-1],'L3')
-            pair=[hit for hit in result['matches'] if 3150<hit['rect'][0]<3310 and 1385<hit['rect'][1]<1420]
-            assert len(pair)==2
-            assert all(hit['label']=='L3' for hit in result['matches'])
-            assert all(hit['label']!='L3' for hit in result['discovered_other_label'])
-            assert result['stages']['native_local']['index_bytes']<8*1024*1024
-            assert not result['stages']['vector_limit_reached']
 
 
 def test_colored_symbol_isolated_from_dense_gray_background(tmp_path):

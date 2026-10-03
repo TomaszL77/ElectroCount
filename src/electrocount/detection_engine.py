@@ -20,10 +20,11 @@ class DetectionEngine:
     def find(self,path,page,template,label="",threshold=.82,progress=lambda p:None,template_path=None,status=lambda text:None):
         status("Odczyt tekstu i przygotowanie wzorca")
         source=template_path or path
-        if not template.get("text_aware") or (template.get("definition_version",0)<10 and
+        if not template.get("text_aware") or (template.get("definition_version",0)<11 and
                 template.get("selection_rect") and hasattr(self.pdf,"open_vector_page")):
             previous=template
-            template=prepare_template(self.pdf,source,template['page'],template.get('selection_rect',template['rect']))
+            from .detection_service import prepare_detection
+            template=prepare_detection(self.pdf,source,template['page'],template.get('selection_bbox',template.get('selection_rect',template['rect'])))
             template['source']=previous.get('source',template['source'])
             template['group_id']=previous.get('group_id',previous.get('representation',{}).get('group_id'))
             template['id']=previous.get('id',previous.get('representation',{}).get('id'))
@@ -52,7 +53,7 @@ class DetectionEngine:
                 vectors={'has_images':True,'unsupported':1,'truncated':False,'paths':[]}
                 signature=None
         elif not self.custom_matcher and hasattr(self.pdf,"extract_vectors"):
-            if not signature:
+            if not signature and template.get('definition_version',0)<11:
                 signature=signature_in_rect(self.pdf.extract_vectors(source,template["page"]),template["rect"])
             vectors=self.pdf.extract_vectors(path,page)
         if not native_stats:progress(10)

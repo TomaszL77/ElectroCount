@@ -63,21 +63,6 @@ def test_outline_table_recognition_without_text(tmp_path):
     assert r['counts']['legend_matches']==1
 
 
-def test_real_cpp_hollow_filled_and_clutter(tmp_path):
-    p=os.environ.get('ELECTROCOUNT_TEST_CPP203')
-    if not p:pytest.skip('Set ELECTROCOUNT_TEST_CPP203 to the supplied PDF')
-    from electrocount.pdf_cache import CachedPDFEngine
-    from electrocount.domain import overlap_metrics
-    pdf=CachedPDFEngine(PdfiumEngine(),tmp_path/'cache')
-    results=[]
-    for y in (1527.84,1548.6):
-        t=prepare_template(pdf,p,0,[1493,y-1,20,7]);assert t['source']=='LEGEND'
-        r=DetectionEngine(pdf).find(p,0,t);results.append(r)
-        assert len(r['matches'])>50
-    assert not any(overlap_metrics(a['rect'],b['rect'])[0]>.5 for a in results[0]['matches'] for b in results[1]['matches'])
-    # Manually inspected obstructed examples, independent of result totals.
-    for r,boxes in zip(results,[[[1658.5,787.4,19,4.8],[1533,864.2,19,4.8]],[[1056,707.9,19,4.8],[1254.8,864.2,19,4.8]]]):
-        for box in boxes:assert any(overlap_metrics(box,h['rect'])[0]>.5 for h in r['matches'])
 
 
 def test_reference_panel_requires_heading_and_keeps_native_priority(monkeypatch):

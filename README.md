@@ -1,52 +1,15 @@
-# ElectroCount 0.7.6 — wersja testowa
+# ElectroCount 0.7.7 — etap 1: poprawne zaznaczenie wzorca
 
-**0.7.6:** poprawa 7–10 na sprawdzonym rzucie do 53/53; dokumenty CPP nadal wymagają poprawek. [Wyniki, ograniczenia i kolejność dalszych prac](docs/detection-076.md).
+Podstawa: gałąź `feature/detection-0.7.6`. Ta wersja naprawia wyłącznie przygotowanie wzorca. Dokładny prostokąt użytkownika zostaje zachowany w `selection_bbox`, oryginalnym RGB i podglądzie. Czarne części, inne kolory, końcówki i dodatki do wypełnionego rdzenia nie są automatycznie usuwane.
 
-Lokalna aplikacja Windows do zliczania konkretnego symbolu wybranego na rzucie albo w legendzie. Wzorzec łączy geometrię, kolor, oznaczenie i jego otoczenie. Program nie klasyfikuje automatycznie wszystkich instalacji.
+`symbol_bbox` opisuje opcjonalną geometrię, `matching_bbox` obszar obrazu dla matchera, a `context_bbox` otoczenie do analizy tekstu. Nie zastępują zaznaczenia. Napisy mogą być analizowane osobno. Po przygotowaniu odbywa się lokalny self-match; jego niepowodzenie jest błędem tworzenia wzorca, a nie niską pewnością.
 
-0.7.2 poprawia zgodność symboli z podzielonymi odcinkami w PDF oraz analizę obrazową symboli przeciętych linią biegnącą poza wzorcem. Panel pokazuje wyraźny licznik znalezionych i filtr aktywnej grupy. [Zmiany i zakres testów](docs/detection-072.md).
+Uruchom **Uruchom.cmd z folderu tej wersji**. Tytuł okna musi zawierać **0.7.7**. Wymagane są dotychczasowe biblioteki/runtime 0.7; nie zmieniono modeli AI ani ich instalacji. Przy pierwszej instalacji użyj Instaluj.cmd. Stary skrót pulpitu może prowadzić do innego folderu.
 
-Profil elektryczny rozróżnia jawne IP20/IP44, EX i 1~/3~. Brak wymaganego oznaczenia kieruje wynik do weryfikacji, a numery obwodów nie tworzą nowych typów. [Zmiany i testy 0.7.3](docs/ai-base-073.md).
+Do próby ręcznej wybierz nowy wzorzec z legendy. Po zapisaniu projektu można wrócić do poprzedniej wersji z osobnego folderu.
 
+**Testy.cmd uruchamia tylko pięć małych kontroli etapu 1.** Wszystkie zaliczone; self-match odnalazł element źródłowy. Nie uruchamiano pełnej regresji ani benchmarków prywatnych dokumentacji. Dawne wyniki nie są dowodem poprawności tej wersji.
 
-**0.7.4:** osobny oryginał RGB i obraz dopasowania, kolorowy podgląd, kontekst tekstowy ze wszystkich stron oraz oddzielenie numeru urządzenia od opisów obwodów. Identyczne symbole 7 i 8 są rozdzielane; brak oznaczenia trafia do REVIEW i nie zwiększa licznika grupy. [Raport 0.7.4, punktacja i testy](docs/template-074.md).
+Diagnostyka wzorca zapisuje wyłącznie `selection_crop.png`, `matching_crop.png` i krótki `template_log.json`. Dawne zestawy wyników i zatwierdzone pliki testowe usunięto z tej gałęzi; cache ma nową przestrzeń nazw.
 
-**0.7.5:** dodatkowa kontrola widocznych fragmentów odzyskuje lekko zasłonięte symbole do REVIEW. Nowe polecenie pozwala zastąpić wzorzec czystym przykładem w tej samej grupie. [Zmiany, wyniki i ograniczenia](docs/occlusion-075.md).
-
-## Uruchomienie
-
-Python 3.12 64-bit → **Instaluj.cmd** → **Uruchom.cmd**. Instalator pobiera przypięte biblioteki i lokalny model DINOv2-base (347 MB), sprawdza SHA-256, uruchamia test modeli i test kontrolny 12/12. Runtime znajduje się w `%LOCALAPPDATA%/ElectroCount/py312-07`. Inference działa bez internetu. Na drugim komputerze wykonaj osobną instalację; nie kopiuj `.runtime-path` ani środowiska Python.
-
-[Instrukcja pracy na dwóch komputerach](START-TUTAJ.md) · [Stan prac](CONTINUE.md) · [Trudne symbole CAD — 0.7.1](docs/cpp203-071.md) · [Architektura 0.7](docs/one-shot-07.md)
-
-Wersja 0.7.1 rozróżnia puste i wypełnione środki symboli, lepiej oddziela oprawę od przewodów i tła oraz wyłącza przykłady z legend i rozpoznanych ramek uwag. Na CPP-TD-CR-EB-203 aplikacja wykrywa 113 L1 i 76 L1-1. Są to wyniki detektora, wymagające weryfikacji; nie stanowią potwierdzenia kompletnej liczby opraw.
-
-## Jak zliczać
-
-1. Otwórz PDF i zaznacz pojedynczy symbol razem z oznaczeniem.
-2. Odczytane oznaczenie zostanie nazwą grupy. Bez oznaczenia powstaje Symbol 01, Symbol 02 itd.
-3. Kliknij **Znajdź**. Domyślnie analizowane są wszystkie strony wszystkich dokumentów projektu. Opcja „Tylko bieżąca strona” ogranicza zakres.
-4. Zweryfikuj oznaczone wyniki. Pomarańczowe elementy wymagają oceny; inne oznaczenia urządzeń nie trafiają automatycznie do aktywnej grupy.
-5. Dla legend bez rozpoznawalnej ramki użyj **Ustawienia → Wzorzec pochodzi z legendy**, następnie ponów wyszukiwanie. Źródło z legendy nie zwiększa ilości. Wzorzec wybrany na rzucie pozostaje rzeczywistym urządzeniem i jest liczony.
-
-L3 na zweryfikowanej hali: **72 oprawy + 1 odniesienie w legendzie**. QP14/A1 w dostarczonym przykładzie: **4 / 8**. To wyniki konkretnych testów, a nie gwarancja dla każdego rysunku.
-
-## Jedna jakość na każdym PC
-
-Nie ma profili ECO / STANDARD / ENHANCED / MAXIMUM. HardwareProfiler pozostaje wyłącznie narzędziem diagnostycznym, nie wybiera silnika ani progów. Analiza korzysta z CPU, stałych modeli, skali i reguł. Po braku pamięci zmniejszany jest wyłącznie cache. Niepełna operacja nie publikuje częściowych ilości jako pełnego wyniku.
-
-## Klasyczny i hybrydowy silnik
-
-**W tej wersji AI domyślny jest DINOv2 Base.** Podstawą weryfikacji pozostaje silnik klasyczny. Uwzględnia natywną geometrię PDF, ORB/RANSAC i kontury dla rastra, dokładny tekst, role adnotacji i rozkład koloru. Oznaczenia EW1/EW2 nie są utożsamiane; odwołania TP04/47 i TP04/52 nie rozdzielają urządzenia na typy.
-
-**Ustawienia → Model analizy: Base / Small / klasyczny…** pozwala wybrać model. Hybryda dodaje embedding FP32 i niezależne przeszukanie całej strony kafelkami. Model zobaczy również regiony pominięte przez klasyczny generator. Kandydaci są scalani, a potem weryfikowani geometrią i tekstem. Lokalny PP-OCRv4 jest fallbackiem dla regionów bez natywnego oznaczenia; nigdy nie zastępuje dostępnego kodu PDF. Brak modelu powoduje jawny błąd, a nie ciche wyłączenie AI na słabszym PC.
-
-Wariant 0.7.3 AI przygotowano do testowania większego modelu na życzenie użytkownika. Domyślny Base nie oznacza potwierdzonej przewagi skuteczności; benchmark syntetyczny nie wykazał poprawy względem Small ani trybu klasycznego. Nie ma treningu własnego modelu, automatycznego zbierania danych ani wysyłania rysunków do sieci. DINOv2 nie jest specjalistycznym modelem symboli elektrycznych. SuperPoint/LightGlue pozostają interfejsem opcjonalnym; aktywny lokalny matcher korzysta z ORB/RANSAC i analizy konturów.
-
-## Diagnostyka i testy
-
-**Ustawienia → Detection Debug** pokazuje osobno wyniki geometrii, cech lokalnych, koloru, embeddingu, tekstu i położenia oraz powód decyzji. `null` oznacza brak użytego sygnału. **Tryb diagnostyczny: zapisuj wycinki** zapisuje wejścia i logi lokalnie. **Diagnostyka.cmd** uruchamia self-test 12/12. **Testy.cmd** uruchamia regresje.
-
-Testy rzeczywistych dokumentów wymagają `ELECTROCOUNT_TEST_HALA` i `ELECTROCOUNT_TEST_PACK`. Bez plików są jawnie pomijane. Benchmark parowany: `python tools/benchmark_retrieval.py --output <folder> --hall <PDF_hali>`. Zawiera metryki precision, recall, F1, FP, FN z dopasowaniem lokalizacji 1:1; sama zgodność ilości nie wystarcza.
-
-DWG/DXF nadal korzystają z interfejsu CADEngine; nie dodano prowizorycznego parsera DWG. Nie ma jeszcze samodzielnego EXE.
+[Raport etapu 1](docs/template-077.md) · [Dalsza praca](CONTINUE.md) · [Drugi komputer](START-TUTAJ.md)

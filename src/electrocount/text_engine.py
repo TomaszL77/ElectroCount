@@ -112,6 +112,7 @@ class TextEngine:
 def prepare_template(engine, path, page, selection):
     import cv2
     import numpy as np
+    selection=list(selection)
     items = engine.extract_text(path, page)
     scale = 2.0
     if min(selection[2:]) < 3 or max(selection[2:]) > 300:
@@ -130,19 +131,14 @@ def prepare_template(engine, path, page, selection):
             logging.warning("Native template unavailable; CPU raster fallback: %s",exc)
     elif hasattr(engine,"extract_vectors"):
         from .vector_engine import signature_in_rect
-        signature=signature_in_rect(engine.extract_vectors(path,page),selection)
-    if signature:
-        rect=signature["bbox"]
-    else:
-        image = engine.render(path, page, scale, selection)
-        image = mask_text(image, items, selection, scale)
-        gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-        ys, xs = np.where(gray < 180)
-        if len(xs) < 12:
-            raise ValueError("Zaznaczenie zawiera sam tekst lub nie zawiera czytelnego symbolu.")
-        x0, y0 = max(0, int(xs.min())-3), max(0, int(ys.min())-3)
-        x1, y1 = min(gray.shape[1], int(xs.max())+4), min(gray.shape[0], int(ys.max())+4)
-        rect = [selection[0]+x0/scale, selection[1]+y0/scale, (x1-x0)/scale, (y1-y0)/scale]
+        signature=signature_in_rect(engine.extract_vectors(path,page),selection,preserve_selection=True)
+    symbol_bbox=list(signature['bbox']) if signature else None
+    # rect is a legacy geometry helper; selection_bbox is never replaced by it.
+    rect=list(symbol_bbox or selection)
+    if not signature:
+        image=engine.render(path,page,scale,selection)
+        if np.count_nonzero(cv2.cvtColor(image,cv2.COLOR_RGB2GRAY)<205)<12:
+            raise ValueError("Zaznaczenie nie zawiera czytelnego symbolu.")
     selected=[i for i in items if intersection(selection,i.bbox)>.8*i.bbox[2]*i.bbox[3]]
     # An explicitly selected, larger label wins over tiny circuit annotations.
     from .text_roles import TextRoleClassifier
@@ -158,25 +154,23 @@ def prepare_template(engine, path, page, selection):
     # Keep all contextual evidence even when the selection explicitly picks a label.
     association['associated_texts']=TextEngine().associate(rect,items).get('associated_texts',[])
     item = association["item"]
-    raster_rect=rect
-    if min(rect[2:])<3:
-        meta=engine.inspect(path)[page];x,y,w,h=rect
-        left,top=max(0,x-3),max(0,y-3)
-        raster_rect=[left,top,min(meta["width"],x+w+3)-left,min(meta["height"],y+h+3)-top]
+    raster_rect=list(selection)
     from .electrical_profile import build_profile
     return {"source": "LEGEND" if signature and signature.get('source_legend') else "DRAWING",
             "electrical_profile":build_profile(rect,selected),
             "associated_texts":association.get('associated_texts',[]),
             "text_role_confidence":association.get('text_role_confidence',0),
-            "page": page, "raster_rect":raster_rect, "selection_rect": selection, "rect": rect, "signature": signature,
+            "page": page, "raster_rect":raster_rect, "selection_rect": list(selection), "selection_bbox": list(selection),
+            "symbol_bbox":symbol_bbox,"matching_bbox":list(selection), "rect": rect, "signature": signature,
             "label": item.normalized_text if item else "",
             "association": association.get("layout"),
             "label_item": item.to_dict() if item else None,
             "spatial_association_score": association["score"],
             "reason": association["reason"], "text_aware": True,
-            "definition_version": 10, "geometry_source": "native_local" if signature else "raster",
+            "definition_version": 11, "geometry_source": "native_local" if signature else "raster",
             "text_bbox":item.bbox if item else None,
-            "self_check":bool(signature),
+            "self_check":False, "extraction_mode":"full_selection",
+            "preserved_paths":len(signature["paths"]) if signature else None,"removed_paths":0,
             "possible_label": (association.get("alternatives") or [{}])[0].get("normalized_text", "")}
 
 

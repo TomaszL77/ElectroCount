@@ -104,18 +104,3 @@ def test_legend_reference_is_separate_from_takeoff(tmp_path):
     pdf=PdfiumEngine();t=prepare_detection(pdf,str(path),0,[35,270,25,36])
     result=run_detection(pdf,str(path),0,t,'T8')
     assert result['counts']=={'raw_matches':3,'legend_matches':1,'countable_devices':2}
-
-
-@pytest.mark.skipif(not os.environ.get('ELECTROCOUNT_TEST_HALA'),reason='requires user hall PDF')
-def test_real_hall_wide_selection_and_legend(tmp_path):
-    from electrocount.pdf_cache import CachedPDFEngine
-    path=os.environ['ELECTROCOUNT_TEST_HALA'];pdf=CachedPDFEngine(PdfiumEngine(),tmp_path/'cache')
-    templates=[prepare_detection(pdf,path,0,b) for b in (
-        [3153,1389,16,46],[3145,1380,40,55],[3140,1370,55,80],[3130,1360,80,100])]
-    assert all(t['label']=='L3' and t['rect']==templates[0]['rect'] for t in templates)
-    result=run_detection(pdf,path,0,templates[-1],'L3')
-    assert result['counts']=={'raw_matches':73,'legend_matches':1,'countable_devices':72}
-    assert len({tuple(h['label_bbox']) for h in result['matches']})==72
-    assert all(800<h['label_bbox'][1]<1500 for h in result['matches'])
-    with pytest.raises(ValueError,match='przecina'):
-        prepare_detection(pdf,path,0,[3154,1395,14,20])

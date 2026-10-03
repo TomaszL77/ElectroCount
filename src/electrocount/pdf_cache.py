@@ -24,7 +24,7 @@ class CachedPDFEngine:
     def _call(self, method, path, *args):
         source = Path(path)
         stat = source.stat()
-        raw = json.dumps(["v5", getattr(self.engine,"cache_namespace","default"), str(source.resolve()),stat.st_size,stat.st_mtime_ns,method,args], sort_keys=True)
+        raw = json.dumps(["v077-selection", getattr(self.engine,"cache_namespace","default"), str(source.resolve()),stat.st_size,stat.st_mtime_ns,method,args], sort_keys=True)
         key = hashlib.sha256(raw.encode()).hexdigest()
         if key in self.memory:
             self.hits += 1

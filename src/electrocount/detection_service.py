@@ -32,6 +32,10 @@ def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_c
         raise
     from .template_representation import build_representation
     template['representation'] = build_representation(pdf,path,page,template)
+    if debug_dir:
+        export_images(debug_dir,pdf,path,page,template)
+    from .template_self_match import validate_self_match
+    validate_self_match(pdf,path,page,template)
     if ocr_enabled:
         from .ai.model_manager import ModelManager
         from .text_engine import mask_text
@@ -44,9 +48,7 @@ def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_c
     template['selection_context'] = selection_context or {}
     if debug_dir:
         try:
-            evidence = export_images(debug_dir, pdf, path, page, template)
-            write_json(Path(debug_dir)/'template_log.json', {'file_sha256': digest(path),
-                'template': template, 'coordinates': selection_context or {}, **evidence})
+            export_images(debug_dir,pdf,path,page,template)
         except Exception as exc:
             template['debug_error'] = str(exc)
             logging.exception('Template debug export failed')
@@ -70,7 +72,7 @@ def run_detection(pdf, path, page, template, label='', threshold=.82, progress=l
     config = config or {}
     from .render_session import RenderSession
     render_session=RenderSession(pdf)
-    recorder = RenderRecorder(render_session, Path(debug_dir)/'renders') if debug_dir else None
+    recorder = None  # 0.7.7: no per-candidate bitmap/report archive
     encoder=None
     from .ai.model_catalog import model_for_mode
     model_name=model_for_mode(config.get('engine_mode','classic'))
@@ -111,13 +113,6 @@ def run_detection(pdf, path, page, template, label='', threshold=.82, progress=l
         raise
     finally:
         render_session.close()
-        report['seconds'] = time.monotonic()-start
-        if recorder:report['actual_matcher_renders'] = recorder.renders
-        destination = Path(debug_dir)/'detection_log.json' if debug_dir else data_dir()/'logs'/'last_detection.json'
-        try:
-            write_json(destination,report)
-        except OSError:
-            logging.exception('Detection log could not be saved')
 
 
 def self_test(pdf, directory, *, config=None, progress=lambda p:None, status=lambda s:None):

@@ -1,4 +1,4 @@
-"""Compact preview of the isolated query, not the surrounding drawing."""
+"""Preview the exact original user selection, including all colours and text."""
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QImage
 import base64
@@ -16,7 +16,7 @@ class TemplatePreview(QWidget):
         crop=representation.get('original_rgb_crop') or representation.get('visual_crop',{})
         self.original=QImage.fromData(base64.b64decode(crop['png_base64'])) if crop.get('png_base64') else QImage()
         self.setVisible(bool(template and (not self.original.isNull() or template.get('signature'))))
-        self.setToolTip('Wyodrębniony symbol używany do wyszukiwania. Oznaczenie jest sprawdzane osobno.')
+        self.setToolTip('Dokładne zaznaczenie użytkownika. Oznaczenie może być analizowane osobno.')
         if template:
             from .electrical_profile import display_label
             self.label=display_label(label,template.get('electrical_profile',{}))

@@ -187,8 +187,10 @@ def without_redundant_outlines(paths):
     return kept
 
 
-def signature(paths):
-    paths=without_redundant_outlines(without_paint_caps([canonical_path(p) for p in paths]))
+def signature(paths, *, preserve_selection=False):
+    paths=[canonical_path(p) for p in paths]
+    if not preserve_selection:
+        paths=without_redundant_outlines(without_paint_caps(paths))
     segments=[s for p in paths for s in p["segments"]]
     if len(segments)<3 or len(segments)>512:
         return None
@@ -197,14 +199,19 @@ def signature(paths):
         return None
     diagonal=math.hypot(*bounds[2:])
     origin=np.array(bounds[:2])
-    return {"bbox":bounds,"paths":paths,"segment_count":len(segments),
+    return {"bbox":bounds,"paths":paths,"segment_count":len(segments),"preserve_selection":preserve_selection,
         "relative_positions":[((np.array(s["points"])-origin)/diagonal).tolist() for s in segments],
         "angles":[math.degrees(math.atan2(*(np.array(s["points"][-1])-s["points"][0])[::-1])) for s in segments],
         "relative_lengths":[float(np.linalg.norm(np.diff(sample_segment(s),axis=0),axis=1).sum()/diagonal) for s in segments],
         "aspect":bounds[2]/bounds[3],"intersections":intersections(segments)}
 
 
-def signature_in_rect(data,rect):
+def signature_in_rect(data,rect,*,preserve_selection=False):
+    if preserve_selection:
+        from .text_engine import intersection
+        selected=[p for p in data['paths'] if intersection(rect,p['bbox']) or contains(rect,p['bbox'])]
+        if any(not contains(rect,p['bbox'],.001) for p in selected):return None
+        return signature(selected,preserve_selection=True)
     paths=[p for p in data["paths"] if contains(rect,p["bbox"])]
     return signature(paths)
 
@@ -258,7 +265,9 @@ class VectorCandidateGenerator:
 
     def verify(self,reference,nearby,rotation,translation,box):
         from collections import Counter
-        nearby=without_redundant_outlines(without_paint_caps([canonical_path(p) for p in nearby]))
+        nearby=[canonical_path(p) for p in nearby]
+        if not reference.get('preserve_selection'):
+            nearby=without_redundant_outlines(without_paint_caps(nearby))
         # CAD backgrounds can leave a tiny spur inside an otherwise complete
         # device. The budget is geometric length, never a percentage of paths;
         # filled areas and missing reference features cannot use this tolerance.

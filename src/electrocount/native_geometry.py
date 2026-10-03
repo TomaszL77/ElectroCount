@@ -115,7 +115,7 @@ class NativeVectorPage:
         self.parents={};self.nested={};self.image_regions=[];self.has_images=False;self.truncated=False;self.decoded=0;self.index_cache_hit=False
         self.cache={};self.cache_segments=0;self.limited_queries=0;self.clipped=set();self.clipped_info={}
         source=Path(path);stat=source.stat()
-        key=hashlib.sha256(json.dumps(['native-v3',str(source.resolve()),stat.st_size,stat.st_mtime_ns,page_index,max_paths]).encode()).hexdigest()
+        key=hashlib.sha256(json.dumps(['native-v077-selection',str(source.resolve()),stat.st_size,stat.st_mtime_ns,page_index,max_paths]).encode()).hexdigest()
         self.cache_file=Path(cache_directory)/(key+'.npz') if cache_directory else None
         try:
             if not self._load_index():
@@ -193,7 +193,7 @@ class NativeVectorPage:
         valid=(local[:,1]>=y-tolerance)&(local[:,0]+local[:,2]<=x+w+tolerance)&(local[:,1]+local[:,3]<=y+h+tolerance)
         return np.sort(ids[valid])
 
-    def decode(self,ids):
+    def decode(self,ids,*,preserve=False):
         if sum(self.index[int(i),5] for i in ids)>self.max_segments:
             self.limited_queries+=1;return None
         result=[]
@@ -212,59 +212,23 @@ class NativeVectorPage:
                     self.cache.clear();self.cache_segments=0
                 self.cache[i]=value;self.cache_segments+=self.index[i,5]
             if self.cache[i] is not None:result.append(self.cache[i])
-        return deduplicate(result)
+        return result if preserve else deduplicate(result)
 
     def template_signature(self,selection,items=()):
-        ids=self.query(selection)
-        colored_ids=[i for i in ids if self.index[i,6]]
-        if colored_ids and max(max(self.bounds[i,2:]) for i in colored_ids)>=.35*max(selection[2:]):
-            ids=colored_ids
-        # Reject a crop cutting a filled body instead of learning an incidental
-        # cross/annotation contained in that crop. Coordinates are PDF points.
+        # A selection is authoritative. Partial/clipped geometry uses the full
+        # selection raster rather than silently retaining only complete paths.
         b=self.bounds;x,y,w,h=selection
-        intersecting=np.flatnonzero((b[:,0]<x+w)&(b[:,1]<y+h)&(b[:,0]+b[:,2]>x)&(b[:,1]+b[:,3]>y)
-            &(np.maximum(b[:,2],b[:,3])>=.5*max(w,h))
-            &(np.minimum(b[:,2],b[:,3])>0)
-            &(np.maximum(b[:,2],b[:,3])/np.maximum(.01,np.minimum(b[:,2],b[:,3]))>=5))
-        for candidate in self.decode(intersecting) or []:
-            if candidate.get('fill') and not contains(selection,candidate['bbox'],.7):
-                raise ValueError("Zaznaczenie przecina symbol. Obejmij całą oprawę wraz z oznaczeniem.")
-        paths=self.decode(ids)
-        if not paths or any(int(i) in self.clipped for i in ids):return None
-        # Native text is a distinct object, so its rectangular mask never erases
-        # a symbol crossing a label. Remove only tiny outlined glyphs enclosed by it.
-        paths=[p for p in paths if not any(contains(i.bbox,p['bbox'],.05) for i in items)]
-        if not paths:return None
-        colored=[p for p in paths if chromatic(p)]
-        foreground='all'
-        if colored and max(max(p['bbox'][2:]) for p in colored)>=.35*max(selection[2:]):
-            paths=colored;foreground='chromatic'
-        filled=[p for p in paths if p.get('fill') and min(p['bbox'][2:])>.05 and
-                max(p['bbox'][2:])/min(p['bbox'][2:])>=5]
-        if len(filled)==1:
-            core=filled[0]
-            # Thin filled bodies (luminaires, bars) are independent native
-            # objects; overlapping annotations and wire continuations aren't.
-            if max(core['bbox'][2:])>=.20*max(selection[2:]):
-                paths=[core]
-        # A thin conduit/channel drawn through a fixture may continue across
-        # many devices on the plan. Its sample end caps are not device ends.
-        context_paths=[]
-        for p in paths:
-            others=[q for q in paths if q is not p]
-            if not others or p.get('fill') or len(p['segments'])!=4 or any(e['kind']!='line' for e in p['segments']):continue
-            ob=bbox([v for q in others for e in q['segments'] for v in e['points']])
-            x,y,w,h=p['bbox'];ox,oy,ow,oh=ob
-            horizontal=w>h and h<oh*.4 and x<ox-.1*ow and x+w>ox+ow+.1*ow and y>=oy and y+h<=oy+oh
-            vertical=h>w and w<ow*.4 and y<oy-.1*oh and y+h>oy+oh+.1*oh and x>=ox and x+w<=ox+ow
-            if horizontal or vertical:context_paths.append(p)
-        if context_paths:paths=[p for p in paths if all(p is not q for q in context_paths)]
-        value=signature(paths)
+        ids=np.flatnonzero((b[:,0]<x+w)&(b[:,1]<y+h)&
+            (b[:,0]+b[:,2]>x)&(b[:,1]+b[:,3]>y))
+        paths=self.decode(ids,preserve=True)
+        from .text_engine import intersection
+        if any(intersection(selection,r)>0 for r in self.image_regions):return None
+        if not paths or self.truncated or any(int(i) in self.clipped for i in ids):return None
+        if any(not contains(selection,p['bbox'],.001) for p in paths):return None
+        value=signature(paths,preserve_selection=True)
         if value:
-            value['native_local']=True
-            value['context_paths']=context_paths
-            value['foreground']=foreground
-            value['core_fill']=len(paths)==1 and bool(paths[0].get('fill'))
+            value.update(native_local=True,context_paths=[],foreground='all',core_fill=False,
+                         preserved_paths=len(paths),removed_paths=0)
         return value
 
     def find(self,reference,items=(),expected='',progress=lambda p:None):
@@ -321,7 +285,7 @@ class NativeVectorPage:
                     nearby_ids=self.query(box,max(3,min(box[2:])*.1))
                     if reference.get('foreground')=='chromatic' and chromatic(path):
                         nearby_ids=[j for j in nearby_ids if self.index[j,6]]
-                    nearby=self.decode(nearby_ids)
+                    nearby=self.decode(nearby_ids,preserve=reference.get("preserve_selection",False))
                     if nearby is not None:nearby=[p for p in nearby if contains(box,p['bbox'],max(.2,min(box[2:])*.02))]
                 if nearby is None:continue
                 if reference.get('foreground')=='chromatic' and chromatic(path):
