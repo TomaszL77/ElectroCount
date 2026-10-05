@@ -1,8 +1,8 @@
 # ElectroCount — drugi komputer
 
-Kod i testy ElectroCount 0.7.8. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
+Kod i testy ElectroCount 0.7.8.1. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
 
-Po rozpakowaniu tej aktualizacji uruchamiaj **Uruchom.cmd z nowego folderu**. Stary skrót może uruchamiać wcześniejszy kod. W tytule okna ma być **0.7.8**. Jeśli runtime 0.7 już działa, wystarczy Uruchom.cmd. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Panel znajduje się w **Uczenie → Uczenie AI**. Domyślnie oceny zapisują się lokalnie; nowy model powstanie po Twoim treningu.
+Po rozpakowaniu tej aktualizacji uruchamiaj **Uruchom.cmd z nowego folderu**. Stary skrót może uruchamiać wcześniejszy kod. W tytule okna ma być **0.7.8.1**. Jeśli runtime 0.7 już działa, wystarczy Uruchom.cmd. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Panel znajduje się w **Uczenie → Uczenie AI**. Domyślnie oceny zapisują się lokalnie; nowy model powstanie po Twoim treningu.
 
 1. Zaloguj się do GitHuba na swoje konto. W GitHub Desktop wybierz File → Clone repository i repozytorium ElectroCount. Jeśli korzystasz z paczki ZIP, najpierw rozpakuj cały folder do lokalnego katalogu. Po pobraniu aktualizacji zamknij poprzednią aplikację, uruchom Instaluj.cmd i Uruchom.cmd.
 2. Zainstaluj Python 3.12 64-bit z python.org wraz z Python Launcher. Sprawdzenie: `py -3.12 --version`.
@@ -30,8 +30,12 @@ Lokalne przykłady wymienione w README mogą być nieobecne w paczce kodu. Testy
 
 ## Testy bieżącej wersji
 
-**Testy.cmd** uruchamia 24 małe kontrole wzorca, renderowania i uczenia. Testy tworzą nowe syntetyczne dokumenty. Dalszą jakość i płynność na własnym komputerze sprawdza ręcznie użytkownik.
+**Testy.cmd** uruchamia 28 małych kontrole wzorca, renderowania i uczenia. Testy tworzą nowe syntetyczne dokumenty. Dalszą jakość i płynność na własnym komputerze sprawdza ręcznie użytkownik.
 
 ## Dane i model na innym komputerze
 
 W panelu Uczenie AI użyj **Eksportuj dane**, a na drugim komputerze **Importuj dane**. Do samego wyszukiwania wystarczy **Eksportuj model**, **Importuj model** i **Użyj tego modelu**. Modele mają rozszerzenie `.ecmodel`. Przeniesienie folderu aplikacji lub aktualizacja z GitHuba nie zastępuje kopii Twojej bazy ocen. Dane są lokalne; nie ma automatycznej synchronizacji chmurowej. Trening korzysta z całej bieżącej bazy uczącej.
+
+## Kolejka Sprawdź
+
+W panelu kliknij **Dodaj wszystkie ze Sprawdź do oceny**. Wiersze **Do oceny** nie uczą modelu. Wybierz wiersz, nadaj ocenę i kliknij **Zmień ocenę**. Zbierane są pozycje z całego bieżącego projektu; ponowne dodanie zachowuje istniejące oceny. Szczegóły zmian: docs/learning-0781.md.

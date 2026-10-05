@@ -5,6 +5,7 @@ from .feature_matcher import OpenCVFeatureMatcher
 from .matcher import TemplateMatcher, template_variant
 from .text_engine import mask_text
 from .vector_engine import VectorCandidateGenerator
+from .foreground import graphic_box
 
 
 def validate_self_match(pdf,path,page,template):
@@ -35,11 +36,12 @@ def _validate_self_match(pdf,path,page,template):
     else:
         box=template['matching_bbox']
         reference=mask_text(pdf.render(path,page,2.,box),items,box,2.)
+        expected_box=graphic_box(reference,box,2.)
         candidates=TemplateMatcher().find(pdf,path,page,template,.82,
             text_items=items,template_items=items,search_regions=[box])
         matched=False
         for candidate in candidates:
-            if overlap_metrics(candidate['rect'],template['rect'])[0]<.90:continue
+            if overlap_metrics(candidate['rect'],expected_box)[0]<.90:continue
             patch_box=candidate.get('verification_rect',candidate['rect'])
             patch=mask_text(pdf.render(path,page,2.,patch_box),items,patch_box,2.)
             transformed=template_variant(cv2.cvtColor(reference,cv2.COLOR_RGB2GRAY),

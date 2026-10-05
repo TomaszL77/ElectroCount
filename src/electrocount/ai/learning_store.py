@@ -11,7 +11,7 @@ from contextlib import contextmanager
 import numpy as np
 from PIL import Image
 
-OUTCOMES = ('correct', 'wrong', 'variant', 'uncertain')
+OUTCOMES = ('correct', 'wrong', 'variant', 'uncertain', 'pending')
 SPLITS = ('train', 'validation', 'test')
 
 
@@ -65,6 +65,10 @@ class LearningStore:
         identifier = hashlib.sha256(json.dumps([doc, record['page'], record['group_id'],
             [round(float(v), 3) for v in record['rect']]], sort_keys=True).encode()).hexdigest()
         with self.connect() as db:
+            # Search can assign fresh detection UUIDs at the same location.
+            # A review-queue import must never erase an existing human rating.
+            if record['outcome']=='pending' and db.execute('SELECT 1 FROM examples WHERE id=?',(identifier,)).fetchone():
+                return identifier
             count = db.execute('SELECT COUNT(*) FROM documents').fetchone()[0]
             # All pages of one PDF stay together. First two documents teach,
             # third validates, fourth tests; later documents default to train.

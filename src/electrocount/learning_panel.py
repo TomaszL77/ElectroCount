@@ -2,7 +2,7 @@
 import json
 import shutil
 from pathlib import Path
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QComboBox, QFileDialog, QMessageBox, QProgressBar,
@@ -11,7 +11,7 @@ from .ai.learning_store import OUTCOMES, SPLITS
 from .ai.tiny_model import TinyPairModel
 
 NAMES = {'correct': 'Poprawny', 'wrong': 'Błędny kształt', 'variant': 'Inny wariant / oznaczenie',
-         'uncertain': 'Niepewny', 'train': 'Uczenie', 'validation': 'Walidacja', 'test': 'Test'}
+         'uncertain': 'Niepewny', 'pending': 'Do oceny', 'train': 'Uczenie', 'validation': 'Walidacja', 'test': 'Test'}
 
 
 class LearningPanel(QDialog):
@@ -23,12 +23,15 @@ class LearningPanel(QDialog):
         layout = QVBoxLayout(self)
         help_text = QLabel('Otwórz PDF, zaznacz wzorzec i wyszukaj. Akceptuj poprawne trafienia, odrzucaj błędne '
                           'i dodawaj pominięcia ręcznie. Tylko Twoje oceny trafiają do nauki. '
-                          '„Inny wariant” i „Niepewny” są przechowywane, ale nie uczą geometrii.')
+                          'Przycisk zbiorczy dodaje pozycje „Sprawdź” z całego bieżącego projektu. '
+                          '„Do oceny”, „Inny wariant” i „Niepewny” nie są używane do treningu.')
         help_text.setWordWrap(True); layout.addWidget(help_text)
         row = QHBoxLayout(); layout.addLayout(row)
         self.collect = QCheckBox('Zapisuj moje oceny'); self.collect.setChecked(window.settings_store.get('learning/collect', True))
         self.collect.toggled.connect(lambda value: window.settings_store.set('learning/collect', value)); row.addWidget(self.collect)
         open_pdf = QPushButton('Dodaj dokument PDF'); open_pdf.clicked.connect(self.open_document); row.addWidget(open_pdf)
+        self.add_review_button = QPushButton('Dodaj wszystkie ze Sprawdź do oceny')
+        self.add_review_button.clicked.connect(self.add_review);row.addWidget(self.add_review_button)
         self.summary = QLabel(); layout.addWidget(self.summary)
         self.table = QTableWidget(0, 5)
         self.table.setStyleSheet('QTableWidget {background:#172232;color:#dce4ef;gridline-color:#344359;border:none;}'
@@ -64,13 +67,22 @@ class LearningPanel(QDialog):
                                ('Eksportuj model', self.export_model), ('Importuj model', self.import_model),
                                ('Eksportuj raport', self.export_report)]:
             button = QPushButton(text); button.clicked.connect(callback); row.addWidget(button); self.file_buttons.append(button)
-        self.service.changed.connect(lambda: self.refresh() if self.isVisible() else None)
-        window.jobs.busy_changed.connect(lambda _: self.refresh() if self.isVisible() else None)
+        self.refresh_timer=QTimer(self);self.refresh_timer.setSingleShot(True)
+        self.refresh_timer.setInterval(200);self.refresh_timer.timeout.connect(self.refresh)
+        self.service.changed.connect(self.schedule_refresh)
+        window.jobs.busy_changed.connect(lambda _: self.schedule_refresh())
         self.service.progress.connect(self.progress.setValue)
         self.service.status.connect(self.status.setText)
         self.service.failed.connect(self.status.setText)
         self.service.trained.connect(lambda _: self.refresh() if self.isVisible() else None)
+        self.collect.toggled.connect(lambda _: self.refresh())
         self.refresh()
+
+    def schedule_refresh(self):
+        if not self.isVisible():return
+        if not self.service.busy:
+            self.refresh_timer.stop();self.refresh()
+        elif not self.refresh_timer.isActive():self.refresh_timer.start()
 
     def showEvent(self, event):
         self.refresh()
@@ -93,7 +105,10 @@ class LearningPanel(QDialog):
             if row['id'] == selected_id: self.table.selectRow(i)
         self.table.blockSignals(False)
         counts = self.store.counts()
-        self.summary.setText(' · '.join(f"{NAMES[s]}: {counts[s]['correct']} poprawnych, {counts[s]['wrong']} błędnych" for s in SPLITS))
+        pending=sum(r['outcome']=='pending' for r in self.rows)
+        self.summary.setText(f'Do oceny: {pending} · '+' · '.join(f"{NAMES[s]}: {counts[s]['correct']} poprawnych, {counts[s]['wrong']} błędnych" for s in SPLITS))
+        self.add_review_button.setEnabled(self.collect.isChecked() and not self.window.busy and not self.window.loading
+                                         and not (self.service.current and self.service.current['kind']=='train'))
         ready, reason = self.store.readiness()
         self.ready.setText(reason + ' Każdy PDF należy w całości do jednego podziału. Zalecane: co najmniej 4 różne dokumenty.')
         self.train_button.setEnabled(ready and not self.service.busy and not self.window.busy and not self.window.loading)
@@ -129,6 +144,10 @@ class LearningPanel(QDialog):
         row = self.selected_row()
         if row:
             self.store.assess(row['id'], OUTCOMES[self.assessment.currentIndex()]); self.refresh()
+
+    def add_review(self):
+        count=self.window.add_review_to_learning()
+        self.status.setText(f'Dodano {count} pozycji z bieżącego projektu. Wybierz ocenę i kliknij „Zmień ocenę”.')
 
     def change_split(self):
         if self.service.busy: return

@@ -4,6 +4,7 @@ import numpy as np
 from ..matcher import template_variant
 from ..text_engine import mask_text
 from ..domain import overlap_metrics
+from ..foreground import matching_scores, placed_symbol_rect, graphic_box, ink_mask
 
 
 def propose(pdf, path, page, template, source, items, reference_items, threshold):
@@ -19,35 +20,25 @@ def propose(pdf, path, page, template, source, items, reference_items, threshold
     gray = cv2.cvtColor(mask_text(rgb, items, [0, 0, width, height], scale), cv2.COLOR_RGB2GRAY)
     ref = mask_text(pdf.render(source, template['page'], scale, box), reference_items, box, scale)
     ref = cv2.cvtColor(ref, cv2.COLOR_RGB2GRAY)
-    if ref.std() < 5:
+    if np.count_nonzero(ink_mask(ref)) < 12:
         return [], ['Wzorzec jest mało czytelny w podglądzie; podstawą pozostaje geometria i lokalna analiza.']
     found = []
+    symbol=graphic_box(ref,box,scale)
     warning = []
     for size in (.85, 1., 1.15):
         for angle in (0, 90, 180, 270):
             pattern = template_variant(ref, size, angle)
             h, w = pattern.shape
             if h > gray.shape[0] or w > gray.shape[1]: continue
-            scores = cv2.matchTemplate(gray, pattern, cv2.TM_CCOEFF_NORMED)
+            scores = matching_scores(gray, pattern)
             peaks = cv2.dilate(scores, np.ones((3, 3), np.uint8))
-            ys, xs = np.where((scores >= max(.72, threshold - .1)) & (scores >= peaks))
+            ys, xs = np.where((scores >= max(.86, threshold)) & (scores >= peaks))
             if len(found) + len(xs) > 6000:
                 warning = ['Skan podglądu ma zbyt wiele propozycji; nie potwierdza kompletności. Użyj pełnej analizy lub dokładniejszego wzorca.']
                 return [], warning
             for y, x in zip(ys, xs):
                 rect = [float(x) / scale, float(y) / scale, w / scale, h / scale]
-                # Selection may include a label or asymmetric whitespace. Keep
-                # the native symbol's offset inside it through every rotation.
-                sx, sy, cw, ch = template['rect']
-                dx, dy = sx - box[0], sy - box[1]
-                bw, bh = box[2:]
-                if angle == 90:
-                    dx, dy, cw, ch = dy, bw - dx - cw, ch, cw
-                elif angle == 180:
-                    dx, dy = bw - dx - cw, bh - dy - ch
-                elif angle == 270:
-                    dx, dy, cw, ch = bh - dy - ch, dx, ch, cw
-                core = [rect[0] + dx * size, rect[1] + dy * size, cw * size, ch * size]
+                core = placed_symbol_rect(symbol,box,rect,size,angle)
                 found.append({'rect': core, 'verification_rect': rect, 'score': float(scores[y, x]),
                               'template_score': float(scores[y, x]), 'scale': size,
                               'rotation': -angle, 'raster_angle': angle, 'source': 'coarse_page'})

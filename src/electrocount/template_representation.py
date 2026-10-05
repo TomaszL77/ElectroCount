@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from .color_features import color_signature
 from .text_engine import mask_text, TextEngine
+from .foreground import transparent_selection
 
 
 @dataclass
@@ -33,10 +34,11 @@ class TemplateRepresentation:
 
 
 def crop_record(image, bbox, scale=2.0):
-    pixels=cv2.cvtColor(image,cv2.COLOR_GRAY2BGR) if image.ndim==2 else cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
+    rgba=image.ndim==3 and image.shape[2]==4
+    pixels=cv2.cvtColor(image,cv2.COLOR_GRAY2BGR) if image.ndim==2 else cv2.cvtColor(image,cv2.COLOR_RGBA2BGRA if rgba else cv2.COLOR_RGB2BGR)
     ok, encoded = cv2.imencode('.png', pixels)
     if not ok: raise ValueError('Nie udało się zapisać wzorca')
-    return {'png_base64':base64.b64encode(encoded).decode(),'bbox':list(bbox),'scale':scale,'color_space':'RGB'}
+    return {'png_base64':base64.b64encode(encoded).decode(),'bbox':list(bbox),'scale':scale,'color_space':'RGBA' if rgba else 'RGB'}
 
 
 def build_representation(pdf, path, page, template):
@@ -71,7 +73,8 @@ def build_representation(pdf, path, page, template):
         associated_texts=associated,source_page=page,source_document=str(Path(path).resolve()),
         source=template.get('source','DRAWING')))
     # Read compatibility for existing matchers, saved projects and diagnostics.
-    record.update(visual_crop=crop_record(visual,rect),context_crop=crop_record(pdf.render(path,page,2.,context),context),
+    record.update(foreground_rgba_crop=crop_record(transparent_selection(original),selection,original_scale),
+        visual_crop=crop_record(visual,rect),context_crop=crop_record(pdf.render(path,page,2.,context),context),
         native_pdf_text=[i for i in nearby if i.get('source')!='ocr'],OCR_text=[i for i in nearby if i.get('source')=='ocr'],
         visual_embedding=None,associated_labels=associated,source_bbox=list(template['rect']),
         text_source=label.get('source'),label_confidence=label.get('confidence',0.))

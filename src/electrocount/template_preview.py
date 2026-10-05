@@ -15,6 +15,8 @@ class TemplatePreview(QWidget):
         representation=(template or {}).get('representation',{})
         crop=representation.get('original_rgb_crop') or representation.get('visual_crop',{})
         self.original=QImage.fromData(base64.b64decode(crop['png_base64'])) if crop.get('png_base64') else QImage()
+        foreground=representation.get('foreground_rgba_crop',{})
+        self.foreground=QImage.fromData(base64.b64decode(foreground['png_base64'])) if foreground.get('png_base64') else self.original
         self.setVisible(bool(template and (not self.original.isNull() or template.get('signature'))))
         self.setToolTip('Dokładne zaznaczenie użytkownika. Oznaczenie może być analizowane osobno.' + '\n' + '\n'.join((template or {}).get('preparation_warnings',[])))
         if template:
@@ -28,10 +30,10 @@ class TemplatePreview(QWidget):
         if not signature and self.original.isNull():return
         painter=QPainter(self);painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
-        painter.fillRect(QRectF(0,2,88,76),QColor('#f7fafc'))
+        painter.fillRect(QRectF(0,2,88,76),QColor('#c6d1dc'))
         if not self.original.isNull():
             fitted=self.original.size().scaled(76,64,Qt.KeepAspectRatio)
-            painter.drawImage(QRectF((88-fitted.width())/2,(80-fitted.height())/2,fitted.width(),fitted.height()),self.original)
+            painter.drawImage(QRectF((88-fitted.width())/2,(80-fitted.height())/2,fitted.width(),fitted.height()),self.foreground)
         else:
             x,y,w,h=signature['bbox'];scale=min(70/max(w,.1),62/max(h,.1))
             ox,oy=(88-w*scale)/2,(80-h*scale)/2

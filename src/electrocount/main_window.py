@@ -177,9 +177,9 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.learning_panel.show();self.learning_panel.raise_()
 
     def record_feedback(self, detection, outcome, group=None):
-        if not self.settings_store.get('learning/collect',True):return
+        if not self.settings_store.get('learning/collect',True):return False
         group=group or next((g for g in self.project.groups if g.id==(detection.group or detection.requested_group)),None)
-        if not group or not group.template:return
+        if not group or not group.template:return False
         from copy import deepcopy
         template=deepcopy(group.template)
         path,page=self.project.page_location(detection.page)
@@ -192,6 +192,20 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             'group_id':group.id,'group_name':group.name,'outcome':outcome,
             'metadata':{'detection_id':detection.id,'label':detection.label,'expected_label':group.label,
                         'manual':detection.source=='manual'}})
+        return True
+
+    def add_review_to_learning(self):
+        if self.busy or self.loading:return 0
+        requests=list(self.learning.queue)+([self.learning.current] if self.learning.current else [])
+        known={r['metadata'].get('detection_id') for r in self.learning_store.examples(False)} | self.feedback_ids
+        known|={r.get('metadata',{}).get('detection_id') for r in requests if r['kind']=='capture'}
+        added=0
+        for detection in self.project.detections:
+            if detection.decision=='review' and detection.id not in known:
+                if self.record_feedback(detection,'pending'):
+                    known.add(detection.id);added+=1
+        self.statusBar().showMessage(f'Dodano {added} pozycji do oceny. Dotychczasowe oceny zachowano.',12000)
+        return added
 
     def assess_selected(self, outcome):
         detection=self.selected_detection()
@@ -1090,6 +1104,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 status = "BEZ PRZYPISANIA · " + status
             origin = "ręczny" if d.source == "manual" else f"kształt {d.graphic_score or d.score:.0%}"
             rating_reason={'partial_occlusion_review':'częściowo zasłonięty — sprawdź','missing_electrical_rating':'brak wymaganego IP / EX / faz',
+                           'shape_similarity_review':'podobny kształt — sprawdź',
                            'ambiguous_electrical_rating':'niejednoznaczne IP / EX / fazy'}.get(d.reason)
             if rating_reason:origin=rating_reason
             item = QListWidgetItem(f"{status} · {d.label or '?'} · {origin} | {d.page+1:02} · {self.project.pages[d.page]['name']}")

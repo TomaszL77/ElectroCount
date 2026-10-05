@@ -7,14 +7,17 @@ import json
 from pathlib import Path
 import cv2
 import numpy as np
+from ..foreground import foreground_crop
 
 SIDE = 20
 DIM = SIDE * SIDE * 2 + 6
-SCHEMA = 'electrocount-pair-mlp-v1'
+SCHEMA = 'electrocount-pair-mlp-v2'
+LEGACY_SCHEMA = 'electrocount-pair-mlp-v1'
 
 
-def descriptor(image):
+def descriptor(image, foreground=True):
     image = np.asarray(image, dtype=np.uint8)
+    if foreground:image=foreground_crop(image)
     h, w = image.shape[:2]
     scale = (SIDE - 2) / max(h, w)
     small = cv2.resize(image, (max(1, round(w * scale)), max(1, round(h * scale))), interpolation=cv2.INTER_AREA)
@@ -28,10 +31,10 @@ def descriptor(image):
     return np.r_[gray.ravel(), edge.ravel(), colors].astype(np.float32)
 
 
-def pair_features(reference, candidate):
-    a = descriptor(reference)
+def pair_features(reference, candidate, foreground=True):
+    a = descriptor(reference, foreground)
     # Align quarter-turn variants using image evidence, never device names.
-    variants = [descriptor(np.rot90(candidate, k).copy()) for k in range(4)]
+    variants = [descriptor(np.rot90(candidate, k).copy(), foreground) for k in range(4)]
     b = min(variants, key=lambda v: float(np.mean(np.abs(a - v))))
     return np.r_[np.abs(a - b), a * b].astype(np.float32)
 
@@ -52,7 +55,7 @@ class TinyPairModel:
         return 1 / (1 + np.exp(-logit))
 
     def score(self, reference, candidate):
-        return float(self.predict(pair_features(reference, candidate)))
+        return float(self.predict(pair_features(reference, candidate, self.metadata['schema']!=LEGACY_SCHEMA)))
 
     def fit(self, x, y, validation, epochs=80, progress=lambda p: None):
         rng = np.random.default_rng(17)
@@ -106,7 +109,7 @@ class TinyPairModel:
         result = cls()
         with np.load(path, allow_pickle=False) as data:
             result.metadata = json.loads(data['metadata'].tobytes())
-            if result.metadata.get('schema') != SCHEMA:
+            if result.metadata.get('schema') not in (SCHEMA, LEGACY_SCHEMA):
                 raise ValueError('Nieobsługiwana wersja modelu.')
             for name in ('w1', 'b1', 'w2', 'b2'):
                 value = data[name]

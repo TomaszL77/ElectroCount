@@ -112,6 +112,7 @@ class DetectionEngine:
         reference=None
         learned_reference=None
         learned_recovered=0
+        shape_recovered=0
         reference_cache={}
         verified=[];rejected=[]
         for index,candidate in enumerate(proposals):
@@ -128,6 +129,16 @@ class DetectionEngine:
                         context_box=[x-4,y-4,w+8,h+8]
                         context=mask_text(self.pdf.render(path,page,sampling,context_box),items,context_box,sampling)
                         evidence=self.features.verify_with_context(transformed,patch,context,round(4*sampling))
+                if self.fast and not evidence['verified'] and not candidate.get('recovery_only'):
+                    from .foreground import shape_evidence
+                    shape=shape_evidence(transformed,patch)
+                    if shape:
+                        # Foreground agreement can rescue a failed ORB gate,
+                        # but only as a proposal for human review.
+                        evidence={**evidence,'verified':True}
+                        candidate.update(shape_recovery=True,foreground_shape_score=shape['geometry_score'],
+                                         foreground_shape_details=shape)
+                        shape_recovered+=1
                 candidate.update(evidence)
                 candidate["graphic_score"]=(candidate["score"]+evidence["feature_score"])/2
                 if candidate.get('source')=='label_geometry_probe' and evidence['verified']:
@@ -205,7 +216,7 @@ class DetectionEngine:
                 "template":template,"coverage_warnings":warnings,"text_items":[i.to_dict() for i in items],
                 "rejected_candidates":rejected,
                 "stages":{"occlusion_label_probes":len(seeds),"partial_occlusion_candidates":sum(bool(c.get("partial_occlusion")) for c in candidates),"generated":len(proposals),"verified":len(candidates),"rejected":len(rejected),
-                          "ai_retrieval":retrieval_stats,"learned_recovered":learned_recovered,"vector_first":bool(signature and vectors),"raster_used":use_raster,
+                          "ai_retrieval":retrieval_stats,"learned_recovered":learned_recovered,"shape_recovered":shape_recovered,"vector_first":bool(signature and vectors),"raster_used":use_raster,
                           "vector_limit_reached":bool(vectors and vectors.get("truncated")),"native_local":native_stats}}
         progress(85)
         status("Łączenie symboli z oznaczeniami tekstowymi")
@@ -291,6 +302,10 @@ class DetectionEngine:
                 state,decision_reason='REVIEW','partial_occlusion_review'
             if candidate.get('learned_recovery') and state!='OTHER_VARIANT':
                 state,decision_reason='REVIEW','learned_pair_review'
+            if candidate.get('shape_recovery'):
+                hit['verification_details']['foreground_shape']=candidate['foreground_shape_details']
+                signals['foreground_shape_score']=candidate['foreground_shape_score']
+                if state!='OTHER_VARIANT':state,decision_reason='REVIEW','shape_similarity_review'
             if candidate.get('occlusion'):hit['verification_details']['occlusion']=candidate['occlusion']
             hit['text_source']=item.source if item else None
             hit.update(shape_score=graphic,visual_score=visual,label_score=signals['device_label_score'],text_association_score=spatial)

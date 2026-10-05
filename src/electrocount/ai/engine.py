@@ -28,7 +28,7 @@ class AIEngine:
         if getattr(self.detector,'fast',False):
             result['pipeline']['engine_mode']='learned'
             result['pipeline']['inactive'].remove('training_collection')
-            result['pipeline']['active']+=['human_feedback_collection']
+            result['pipeline']['active']+=['human_feedback_collection','foreground_shape_review']
             model=getattr(self.detector,'learned_model',None)
             if model:
                 result['pipeline']['active']+=['learned_pair_mlp']

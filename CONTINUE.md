@@ -1,3 +1,13 @@
+# 0.7.8.1 — kolejka Sprawdź, bez białego otoczenia, mocniejsze kształty
+
+Podstawa: 0.7.8, commit 83c8bcc3d8aff4c4b70445733a8efbf0b53db31f. Dodano przycisk zbiorczego dodania wszystkich nowych review z projektu do bazy jako pending (Do oceny), bez nadpisywania istniejących ocen lub treningu na nieocenionych przykładach. Zapis pozostaje w osobnym procesie; odświeżenia tabeli są grupowane.
+
+Oryginalne zaznaczenie zachowane 1:1. Nowy foreground.py maskuje zewnętrzny biały papier, zachowując wewnętrzne puste obszary figur. Matcher i szybki skan używają maski; ramki obejmują grafikę i prawidłowo zachowują jej przesunięcie po obrocie. Podgląd ma dodatkowy PNG RGBA. Test źródła porównuje ramkę grafiki, nie papieru.
+
+Model v2 normalizuje puste marginesy, zachowując proporcje. Model v1 nadal wczytywany z poprzednim przetwarzaniem; do nowego wejścia użytkownik powinien ponownie wytrenować i aktywować model. Fast może odzyskać zgodny kontur po nieudanej weryfikacji ORB wyłącznie do REVIEW; inne oznaczenia i profile nadal obowiązują. Nie deklarować gotowych wag ani skuteczności na rzeczywistych schematach.
+
+Sprawdzenie: 28 małych kontroli, diagnostyka PASS 12/12, syntetyczny PDF rastrowy z zewnętrzną linią: obie kopie dostępne do sprawdzenia, poprawne ramki i A1. Opis obsługi i ograniczeń: docs/learning-0781.md. Renderer zachowany bez zmian.
+
 # 0.7.8 — zbieranie ocen i własny mały model
 
 Użytkownik potwierdził poprawę renderowania w 0.7.7.2 i zlecił panel/model oraz wcześniejsze zmiany wyszukiwania. Podstawa: d3fee3f3635d310820215b3ef1897e4aac671912. Renderer pozostaje zachowany.

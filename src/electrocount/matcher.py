@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from .domain import overlap_metrics
 from .text_engine import mask_text
+from .foreground import matching_scores, placed_symbol_rect, graphic_box, ink_mask
 
 
 class SimpleSymbolMatcher:
@@ -37,7 +38,7 @@ class SimpleSymbolMatcher:
                     image_rgb = mask_text(image_rgb, text_items, rect, scale)
                 image = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2GRAY)
                 if image.shape[0] >= th and image.shape[1] >= tw:
-                    scores = cv2.matchTemplate(image, pattern, cv2.TM_CCOEFF_NORMED)
+                    scores = matching_scores(image, pattern)
                     maxima = cv2.dilate(scores, np.ones((3, 3), np.uint8))
                     ys, xs = np.where((scores >= threshold) & (scores >= maxima))
                     if len(xs)+len(candidates) > 20000:
@@ -78,8 +79,9 @@ class TemplateMatcher:
         reference=engine.render(template_path or path,template["page"],scale,box)
         reference=mask_text(reference,template_items or [],box,scale)
         reference=cv2.cvtColor(reference,cv2.COLOR_RGB2GRAY)
-        if reference.std()<8:
+        if np.count_nonzero(ink_mask(reference))<12:
             raise ValueError("Wzorzec nie zawiera wystarczającej grafiki.")
+        symbol=graphic_box(reference,box,scale)
         variants=[(s,a,template_variant(reference,s,a)) for s in self.SCALES for a in self.ANGLES]
         max_w=max(v.shape[1] for _,_,v in variants);max_h=max(v.shape[0] for _,_,v in variants)
         meta=engine.inspect(path)[page]
@@ -103,18 +105,14 @@ class TemplateMatcher:
                 th,tw=pattern.shape
                 if image.shape[0]<th or image.shape[1]<tw:
                     continue
-                scores=cv2.matchTemplate(image,pattern,cv2.TM_CCOEFF_NORMED)
+                scores=matching_scores(image,pattern)
                 maxima=cv2.dilate(scores,np.ones((3,3),np.uint8))
                 ys,xs=np.where((scores>=threshold)&(scores>=maxima))
                 if len(xs)+len(candidates)>30000:
                     raise ValueError("Zbyt wiele kandydatów. Wybierz bardziej charakterystyczny wzorzec.")
                 for yy,xx in zip(ys,xs):
                     patch=[x+float(xx)/scale,y+float(yy)/scale,tw/scale,th/scale]
-                    core=patch
-                    if box!=template["rect"]:
-                        cw,ch=template["rect"][2:];a=math.radians(angle)
-                        cw,ch=size*(abs(math.cos(a))*cw+abs(math.sin(a))*ch),size*(abs(math.sin(a))*cw+abs(math.cos(a))*ch)
-                        core=[patch[0]+(patch[2]-cw)/2,patch[1]+(patch[3]-ch)/2,cw,ch]
+                    core=placed_symbol_rect(symbol,box,patch,size,angle)
                     candidates.append({"rect":core,"verification_rect":patch,
                         "score":float(scores[yy,xx]),"template_score":float(scores[yy,xx]),
                         "scale":size,"rotation":-angle,"raster_angle":angle,"source":"raster"})
@@ -127,4 +125,3 @@ class TemplateMatcher:
                        and overlap_metrics(candidate["rect"],other["rect"])[0]>.3 for other in kept):
                 kept.append(candidate)
         return kept
-
