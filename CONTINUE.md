@@ -1,3 +1,11 @@
+# 0.7.7.2 — renderowanie przed panelem uczenia
+
+Podstawa: gałąź 0.7.7, commit 2ebe006d6421872d5d52cc249bdcd463d51acd14. Zmieniono wyłącznie wyświetlanie PDF i kolejkę podglądu. RenderService używa trwałego procesu render_worker, trzech aktywnych stron PDFium i cache kafelków. Rendering nie importuje detektora, OCR, ONNX ani modeli. viewport_tiles tworzy stałą siatkę 512 px, uwzględnia DPI i renderuje brzeg wokół widoku. DrawingView nie usuwa poprzednich kafelków przy przesunięciu. Kafelki mają margines renderowania dla poprawnego próbkowania skanów. Zaznaczanie i analiza pozostały zgodne z 0.7.7.1.
+
+15 PASS: 9 kontroli wzorca i 6 renderowania; ograniczona, celowa weryfikacja. Nie wykonywano pełnej regresji detekcji. Benchmark identycznego fragmentu: mediana 250 ms → 18 ms w tym Linux; porównanie czterech świeżych kafelków, nie czasu całej strony lub wyszukiwania. docs/render-0772.md zawiera wyniki i ograniczenia.
+
+Użytkownik chce najpierw ręcznie sprawdzić poprawę renderowania. Dopiero potem przechodzimy do zbierania ocen i panelu treningowego. Nie deklarować gotowego panelu, treningu ani przyspieszenia AI Base. Gałąź 0.7.7 pozostaje kopią 0.7.7.1; aktualizacja renderowania ma osobną gałąź 0.7.7.2.
+
 # 0.7.7.1 — poprawka zapisu i podglądu zaznaczenia
 
 Test rozpoznawania źródła jest diagnostyką: nie blokuje zapisania prawidłowego zaznaczenia. Nieudany test zostawia self_check=false oraz widoczne ostrzeżenie. Nie dodaje trafień do zliczenia. Oryginał nadal pochodzi dokładnie z selection_bbox, ma adaptacyjną rozdzielczość dla małych symboli. Podgląd zachowuje kolory i proporcje oraz wygładza skalowanie. Współrzędne myszy nie są zaokrąglane do całych pikseli przed przeliczeniem na PDF.

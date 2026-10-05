@@ -13,6 +13,8 @@ from .domain import Project, Group, Detection, ConflictEngine, counts, near
 from .drawing_view import DrawingView
 from .history import History
 from .jobs import JobManager
+from .render_service import RenderService
+from .viewport_tiles import viewport_tiles
 from .project_manager import ProjectManager
 from .import_ui import ImportWindowMixin
 from .results_manager import ResultsManager
@@ -74,6 +76,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.thumb_loaded, self.thumb_pending = set(), set()
         self.detail_key = None
         self.jobs = JobManager(self)
+        self.renderer = RenderService(self)
+        self.renderer.failed.connect(self.failure)
         self.jobs.failed.connect(self.failure)
         self.jobs.busy_changed.connect(self.busy_changed)
         self.jobs.progress.connect(lambda v: self.operation_progress.set_progress(v))
@@ -87,7 +91,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.register_commands()
         self.build_ui()
         self.init_import_ui()
-        self.view.viewport_changed.connect(lambda:self.view.draw_detections(self.project,self.conflict_ids,self.selected,self.review_only.isChecked(),self.active_group_only.isChecked()))
+        self.overlay_scale = None
+        self.view.viewport_changed.connect(self.refresh_view_overlays)
         self.refresh()
         self.performance = PerformanceController(self.settings_store,self)
         self.performance.changed.connect(self.update_performance)
@@ -424,6 +429,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
 
     def replace_project(self, project, folder):
         self.jobs.clear_render_queue()
+        self.renderer.clear()
         self.generation += 1
         self.project, self.folder = project, folder
         self.history, self.dirty, self.selected = History(), False, ""
@@ -491,23 +497,24 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.dirty = True
         page = self.project.pages[index]
         self.view.set_page(page["width"], page["height"])
+        self.renderer.set_tiles([])
         self.detail_key = None
         generation = self.generation
         if index in self.preview_cache:
             self.view.set_preview(self.preview_cache[index])
         else:
-            scale = min(1.5, 1600/max(page["width"], page["height"]))
-            def ready(path):
+            scale = min(2.0, 2048/max(page["width"], page["height"]))
+            def ready(pixmap):
                 if generation != self.generation:
                     return
-                pixmap = QPixmap(path)
                 self.preview_cache[index] = pixmap
                 while len(self.preview_cache) > 6:
                     self.preview_cache.popitem(last=False)
                 if index == self.project.page:
                     self.view.set_preview(pixmap)
             path, source_page = self.project.page_location(index)
-            self.jobs.submit({"kind": "render", "path": path, "page": source_page, "scale": scale}, ready)
+            self.renderer.submit({"path": path, "page": source_page, "scale": scale},
+                                 ready, ('preview', generation, index))
         self.refresh_results()
         self.load_thumbnails()
         self.statusBar().showMessage(f"{page['name']} · {index+1}/{len(self.project.pages)}")
@@ -522,14 +529,15 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 continue
             self.thumb_pending.add(index)
             page = self.project.pages[index]
-            def ready(path, index=index):
+            def ready(pixmap, index=index):
                 if generation == self.generation:
                     self.thumb_pending.discard(index)
                     self.thumb_loaded.add(index)
-                    self.pages.item(index).setIcon(QIcon(QPixmap(path)))
+                    self.pages.item(index).setIcon(QIcon(pixmap))
             path, source_page = self.project.page_location(index)
-            self.jobs.submit({"kind": "render", "path": path, "page": source_page,
-                              "scale": 128/max(page["width"], page["height"])}, ready)
+            self.renderer.submit({"path": path, "page": source_page,
+                                  "scale": 128/max(page["width"], page["height"])},
+                                 ready, ('thumb', generation, index))
 
     def render_detail(self):
         if not self.project.pages:
@@ -539,23 +547,43 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         if old_view != self.project.view:
             self.dirty = True
             self.setWindowTitle(f"ElectroCount {__version__} · {self.project.name} *")
-        scale = min(4.0, max(1.0, round(self.view.transform().m11()*2)/2))
         rect = self.view.mapToScene(self.view.viewport().rect()).boundingRect().intersected(self.view.page_rect)
         if rect.isEmpty():
+            self.renderer.set_tiles([])
             return
-        scale = min(scale, 2400/max(rect.width(), rect.height()))
         box = [rect.x(), rect.y(), rect.width(), rect.height()]
-        key = (self.generation, self.project.page, round(scale, 2), *[round(v, 1) for v in box])
-        if key == self.detail_key:
-            return
-        self.detail_key = key
         generation, page = self.generation, self.project.page
-        def ready(path):
-            if generation == self.generation and page == self.project.page and key == self.detail_key:
-                self.view.set_detail(QPixmap(path), box, scale)
-        self.jobs.queue = type(self.jobs.queue)((r, c) for r, c in self.jobs.queue if not (r["kind"] == "render" and "rect" in r))
         path, source_page = self.project.page_location(page)
-        self.jobs.submit({"kind": "render", "path": path, "page": source_page, "scale": scale, "rect": box}, ready)
+        plan = viewport_tiles(self.view.page_rect.width(), self.view.page_rect.height(),
+                              box, self.view.transform().m11(),
+                              self.view.viewport().devicePixelRatioF())
+        self.view.needed_tiles = {(generation, page, *tile.key) for tile in plan}
+        entries = []
+        for tile in plan:
+            key = (generation, page, *tile.key)
+            if key in self.view.tiles:
+                self.view.tiles.move_to_end(key)
+                continue
+            cached = self.renderer.get(key)
+            if cached is not None:
+                self.view.set_tile(key, cached, tile.rect, tile.scale)
+                continue
+            def ready(pixmap, tile=tile, key=key):
+                if generation == self.generation and page == self.project.page:
+                    self.view.set_tile(key, pixmap, tile.rect, tile.scale)
+            entries.append(({'path': path, 'page': source_page, 'scale': tile.scale,
+                             'rect': tile.rect, 'visible': tile.visible}, ready, key))
+        self.view.trim_tiles()
+        self.renderer.set_tiles(entries)
+
+    def refresh_view_overlays(self):
+        # Panning moves scene items without rebuilding every detection marker.
+        # Only zoom changes their minimum on-screen size.
+        scale = self.view.transform().m11()
+        if scale != self.overlay_scale:
+            self.overlay_scale = scale
+            self.view.draw_detections(self.project, self.conflict_ids, self.selected,
+                                      self.review_only.isChecked(), self.active_group_only.isChecked())
 
     def rename_page(self, item):
         if self.busy:
@@ -927,6 +955,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
 
     def sync_after_history(self):
         self.jobs.clear_render_queue()
+        self.renderer.clear()
         self.generation += 1
         self.preview_cache.clear()
         self.rebuild_page_list()
@@ -1046,5 +1075,6 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             event.ignore()
             return
         self.performance.close()
+        self.renderer.close()
         self.jobs.close()
         event.accept()

@@ -1,8 +1,8 @@
 # ElectroCount — drugi komputer
 
-Kod i testy ElectroCount 0.7.7. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
+Kod i testy ElectroCount 0.7.7.2. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
 
-Po rozpakowaniu tej aktualizacji uruchamiaj **Uruchom.cmd z nowego folderu**. Stary skrót może uruchamiać wcześniejszy kod. W tytule okna ma być **0.7.7**. Jeśli runtime 0.7 już działa, uruchom Instaluj_AI.cmd, aby pobrać większy model Base (347 MB), potem Uruchom.cmd. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Otwórz projekt i ponownie kliknij Znajdź — zapisane wyniki nie przeliczają się same.
+Po rozpakowaniu tej aktualizacji uruchamiaj **Uruchom.cmd z nowego folderu**. Stary skrót może uruchamiać wcześniejszy kod. W tytule okna ma być **0.7.7.2**. Jeśli runtime 0.7 już działa, do testu wyświetlania wystarczy Uruchom.cmd. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Otwórz schemat, powiększ i przesuwaj go w różne strony. Nie trzeba ponawiać wyszukiwania, aby sprawdzić renderowanie.
 
 1. Zaloguj się do GitHuba na swoje konto. W GitHub Desktop wybierz File → Clone repository i repozytorium ElectroCount. Jeśli korzystasz z paczki ZIP, najpierw rozpakuj cały folder do lokalnego katalogu. Po pobraniu aktualizacji zamknij poprzednią aplikację, uruchom Instaluj.cmd i Uruchom.cmd.
 2. Zainstaluj Python 3.12 64-bit z python.org wraz z Python Launcher. Sprawdzenie: `py -3.12 --version`.
@@ -28,6 +28,6 @@ Rzeczywiste PDF/DWG/DXF, zapisane projekty, cache, modele i ustawienia sprzętu 
 
 Lokalne przykłady wymienione w README mogą być nieobecne w paczce kodu. Testy tworzą własne syntetyczne PDF; do zwykłej pracy otwórz swój PDF. W etapie 1 wybierz nowy wzorzec na własnym PDF.
 
-## Testy etapu 1
+## Testy bieżącej wersji
 
-**Testy.cmd** uruchamia wyłącznie pięć małych kontroli wzorca. Nie ustawiaj ścieżek do dawnych prywatnych zestawów ani nie uruchamiaj pełnej regresji w tym etapie. Dalszą skuteczność sprawdza ręcznie użytkownik.
+**Testy.cmd** uruchamia 15 małych kontroli wzorca i renderowania. Testy tworzą nowe syntetyczne dokumenty. Dalszą jakość i płynność na własnym komputerze sprawdza ręcznie użytkownik.

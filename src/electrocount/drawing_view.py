@@ -1,3 +1,5 @@
+import math
+from collections import OrderedDict
 from PySide6.QtCore import Qt, QRectF, QTimer, Signal
 from PySide6.QtGui import QColor, QPen, QBrush, QPainter
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem
@@ -23,19 +25,29 @@ class DrawingView(QGraphicsView):
         self.overlays = []
         self.preview = None
         self.detail = None
+        self.tiles = OrderedDict()
+        self.tile_bytes = 0
+        self.tile_limit = 64 * 1024 * 1024
+        self.needed_tiles = set()
         self.page_rect = QRectF()
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
-        self.timer.setInterval(220)
+        self.timer.setInterval(16)
         self.timer.timeout.connect(self.viewport_changed)
         self.horizontalScrollBar().valueChanged.connect(self.schedule_detail)
         self.verticalScrollBar().valueChanged.connect(self.schedule_detail)
 
     def schedule_detail(self, *_):
-        self.timer.start()
+        # Throttle to one request per frame, including during continuous drag.
+        # Restarting a debounce timer would postpone quality until drag stops.
+        if not self.timer.isActive():
+            self.timer.start()
 
     def set_page(self, width, height):
         self.scene().clear()
+        self.tiles.clear()
+        self.tile_bytes = 0
+        self.needed_tiles.clear()
         self.preview = self.detail = self.rubber = None
         self.overlays = []
         self.page_rect = QRectF(0, 0, width, height)
@@ -47,6 +59,7 @@ class DrawingView(QGraphicsView):
         if self.preview:
             self.scene().removeItem(self.preview)
         self.preview = self.scene().addPixmap(pixmap)
+        self.preview.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
         self.preview.setScale(self.page_rect.width()/pixmap.width())
         self.preview.setZValue(1)
 
@@ -54,9 +67,35 @@ class DrawingView(QGraphicsView):
         if self.detail:
             self.scene().removeItem(self.detail)
         self.detail = self.scene().addPixmap(pixmap)
+        self.detail.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
         self.detail.setPos(rect[0], rect[1])
         self.detail.setScale(1/scale)
         self.detail.setZValue(2)
+
+    def set_tile(self, key, pixmap, rect, scale):
+        if key in self.tiles:
+            self.tiles.move_to_end(key)
+            return
+        item = self.scene().addPixmap(pixmap)
+        item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
+        item.setPos(rect[0], rect[1])
+        item.setScale(1 / scale)
+        # Retain sharper tiles over lower resolution fallbacks after zooming out.
+        item.setZValue(2 + (math.log2(scale) + 8) / 100)
+        size = pixmap.width() * pixmap.height() * 4
+        self.tiles[key] = (item, size)
+        self.tile_bytes += size
+        self.trim_tiles()
+
+    def trim_tiles(self):
+        for key in list(self.tiles):
+            if self.tile_bytes <= self.tile_limit:
+                break
+            if key in self.needed_tiles:
+                continue
+            item, size = self.tiles.pop(key)
+            self.scene().removeItem(item)
+            self.tile_bytes -= size
 
     def set_mode(self, mode):
         self.mode = mode
