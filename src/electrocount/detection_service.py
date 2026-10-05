@@ -10,7 +10,7 @@ from .diagnostics import (RenderRecorder, data_dir, digest, export_images, runti
 from .text_engine import prepare_template
 
 
-def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_context=None, ocr_enabled=False, model_name='small'):
+def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_context=None, ocr_enabled=False, model_name='small', visual_embedding=True):
     try:
         template = prepare_template(pdf, path, page, selection)
         if not template.get('label') and (ocr_enabled or not pdf.extract_text(path,page)):
@@ -36,7 +36,7 @@ def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_c
         export_images(debug_dir,pdf,path,page,template)
     from .template_self_match import validate_self_match
     validate_self_match(pdf,path,page,template)
-    if ocr_enabled:
+    if ocr_enabled and visual_embedding:
         from .ai.model_manager import ModelManager
         from .text_engine import mask_text
         from dataclasses import asdict
@@ -79,7 +79,16 @@ def run_detection(pdf, path, page, template, label='', threshold=.82, progress=l
     if model_name:
         from .ai.model_manager import ModelManager
         encoder=ModelManager(Path(__file__).resolve().parents[2]/'models').load_visual_encoder(model_name)
-    engine = AIEngine(recorder or render_session,visual_encoder=encoder)
+    learned = None
+    learning_warning = None
+    if config.get('engine_mode') == 'learned' and config.get('learned_model'):
+        from .ai.tiny_model import TinyPairModel
+        try:
+            learned = TinyPairModel.load(config['learned_model'])
+        except (OSError, ValueError, KeyError) as exc:
+            learning_warning = 'Własny model niedostępny; użyto geometrii i obrazu: ' + str(exc)
+    engine = AIEngine(recorder or render_session,visual_encoder=encoder,
+                     learned_model=learned, fast=config.get('engine_mode') == 'learned')
     report = {'runtime': runtime_info(), 'path': str(path), 'file_sha256': digest(path),
         'page': page, 'template': template, 'template_bbox': template['rect'],
         'template_path':str(template_path or path), 'template_file_sha256': digest(template_path or path), 'threshold': threshold,
@@ -91,6 +100,7 @@ def run_detection(pdf, path, page, template, label='', threshold=.82, progress=l
         if gui_code and gui_code!=report['runtime']['code']['source_sha256']:
             raise RuntimeError("Kod aplikacji zmienił się od jej uruchomienia. Zapisz projekt i uruchom ElectroCount ponownie.")
         result = engine.find(path,page,template,label,threshold,progress,template_path,status)
+        if learning_warning: result['coverage_warnings'].append(learning_warning)
         report['runtime']['model']=result['pipeline'].get('model')
         result['result_sha256'] = result_signature(result)
         result['pipeline']['execution'] = config

@@ -1,15 +1,25 @@
-# ElectroCount 0.7.7.2 — szybkie, ostre wyświetlanie schematów
+# ElectroCount 0.7.8 — własny mały model AI
 
-Podstawa: 0.7.7.1, commit `2ebe006d6421872d5d52cc249bdcd463d51acd14`. Schemat jest renderowany kafelkami w osobnym, stałym procesie PDFium. Widok zapamiętuje ostre fragmenty i doczytuje sąsiednie; przeciąganie uruchamia renderowanie podczas ruchu. Rozdzielczość uwzględnia powiększenie i DPI monitora.
+Panel **Uczenie → Uczenie AI** zapisuje Twoje oceny, uruchamia lokalny trening i porównuje modele na odłożonych przykładach. Dane i modele można eksportować na drugi komputer. Zachowano ostre renderowanie kafelkowe i dokładny podgląd zaznaczenia z 0.7.7.2.
 
-Dokładny prostokąt użytkownika pozostaje zachowany w `selection_bbox`, oryginalnym RGB i podglądzie. Nieudany test rozpoznawania nie blokuje jego zapisu. Poprawka renderowania nie zmienia detektora ani zliczeń; panel uczenia nie został jeszcze dodany.
+## Uruchomienie
 
-Uruchom **Uruchom.cmd z folderu tej wersji**. Tytuł okna musi zawierać **0.7.7.2**. Biblioteki/runtime 0.7 pozostają zgodne. Przy pierwszej instalacji lub brakujących bibliotekach użyj Instaluj.cmd. Stary skrót pulpitu może prowadzić do innego folderu.
+Rozpakuj wersję do nowego folderu i uruchom **Uruchom.cmd z tego folderu**. W oknie musi być **0.7.8**. Jeśli działa runtime 0.7, nie musisz ponownie pobierać bibliotek ani dużego modelu. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Instalator domyślnie nie pobiera DINO Base; Instaluj_AI.cmd pozostaje opcją dla pełnego, dotychczasowego trybu.
 
-Do próby ręcznej otwórz swój PDF, powiększ drobne oznaczenia i przesuwaj widok, także tam i z powrotem. Sprawdź zmianę stron i zaznaczenie wzorca. Zupełnie nowy obszar może przez chwilę korzystać z podglądu; nie trzeba już zatrzymywać przeciągania, aby rozpocząć doczytywanie jakości.
+## Nauka podczas pracy
 
-**Testy.cmd uruchamia 15 małych kontroli renderowania i wzorca.** Wynik: 15 PASS. Na świeżym syntetycznym rysunku mediana czasu tego samego fragmentu 512×512 px spadła z 250 ms do 18 ms w tym środowisku Linux. Nie jest to pomiar na komputerze użytkownika ani czas całej analizy.
+1. Otwórz PDF, zaznacz wzorzec i wyszukaj.
+2. **Akceptuj** poprawne elementy, **Odrzuć** błędne kształty, **Dodaj ręcznie** pominięcia. Oceny zapisują się automatycznie.
+3. Otwórz **Uczenie → Uczenie AI**, sprawdź wycinki i podział dokumentów.
+4. Zbierz przykłady z co najmniej czterech PDF-ów. Panel pokazuje, czego jeszcze brakuje do treningu.
+5. Kliknij **Wytrenuj model**, obejrzyj wynik i wybierz **Użyj tego modelu**.
 
-Diagnostyka wzorca zapisuje wyłącznie `selection_crop.png`, `matching_crop.png` i krótki `template_log.json`. Dawne zestawy wyników i zatwierdzone pliki testowe usunięto z tej gałęzi; cache ma nową przestrzeń nazw.
+Pierwsza baza jest pusta. Model nauczy się na Twoich ocenach; aplikacja nie dostarcza losowych wag jako gotowej wiedzy. Minimum do pierwszej próby: 20 poprawnych + 20 błędnych do uczenia z dwóch PDF-ów, 5 + 5 do walidacji z osobnego PDF-u i 5 + 5 do testu z kolejnego. Oceny „inny wariant” i „niepewny” pozostają zapisane, ale nie uczą geometrii.
 
-[Raport renderowania](docs/render-0772.md) · [Wzorzec](docs/template-077.md) · [Dalsza praca](CONTINUE.md) · [Drugi komputer](START-TUTAJ.md)
+## Wyszukiwanie i wyniki
+
+Domyślnie działa **Szybki + własny model**: geometria, tekst, matcher obrazu, tańszy skan podglądu i wytrenowana mała sieć dla kandydatów. Nie uruchamia pełnostronicowego DINO Base. Bez własnych wag działa szybka część geometryczna i obrazowa. Pewne inne oznaczenie nadal wyklucza przypisanie do szukanej grupy. Odzyskane wyłącznie przez małą sieć elementy wymagają sprawdzenia przed zliczeniem.
+
+Statystyki treningu mierzą ocenione pary wycinków, nie odnalezienie wszystkich opraw na całej stronie. Skuteczność na realnej dokumentacji wymaga dalszych pomiarów. Testy tej wersji: **24 zaliczone** oraz przepływ treningu z panelu na świeżych syntetycznych przykładach. Testy.cmd uruchamia mały zestaw wzorca, renderowania i uczenia; nie wszystkie historyczne testy.
+
+[Instrukcja i raport uczenia](docs/learning-078.md) · [Raport renderowania](docs/render-0772.md) · [Dalsza praca](CONTINUE.md) · [Drugi komputer](START-TUTAJ.md)

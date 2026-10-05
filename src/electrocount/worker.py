@@ -29,7 +29,7 @@ def execute(request, plan):
     if kind=="template":
         emit({"status":"Wyodrębnianie symbolu i oznaczenia z zaznaczenia…"})
         return prepare_detection(engine,request["path"],request["page"],request["rect"],
-            debug_dir=request.get('debug_dir'),selection_context=request.get('selection_context'),ocr_enabled=request.get('ocr_enabled',False),model_name=request.get('model_name','small'))
+            debug_dir=request.get('debug_dir'),selection_context=request.get('selection_context'),ocr_enabled=request.get('ocr_enabled',False),model_name=request.get('model_name','small'),visual_embedding=request.get('visual_embedding',True))
     if kind=="inspect":
         return engine.inspect(request["path"])
     if kind=="render":
@@ -85,4 +85,3 @@ def main():
 
 if __name__=="__main__":
     main()
-

@@ -18,13 +18,12 @@ if errorlevel 1 goto fail
 if errorlevel 1 goto fail
 "%EC_VENV%\Scripts\python.exe" check_runtime.py
 if errorlevel 1 goto fail
-"%EC_VENV%\Scripts\python.exe" tools\install_models.py
-if errorlevel 1 goto fail
 set "PYTHONPATH=%~dp0src"
-"%EC_VENV%\Scripts\python.exe" -m electrocount.debug_cli --self-test --engine-mode hybrid_base
+"%EC_VENV%\Scripts\python.exe" -m electrocount.debug_cli --self-test --engine-mode learned
 if errorlevel 1 goto fail
 >"%~dp0.runtime-path" echo %EC_VENV%
 echo Gotowe. Test diagnostyczny PASS. Uruchom Uruchom.cmd.
+echo Duzy model Base jest opcjonalny: Instaluj_AI.cmd. Wlasny model wytrenujesz w panelu Uczenie AI.
 pause
 exit /b 0
 :fail

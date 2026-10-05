@@ -1,3 +1,15 @@
+# 0.7.8 — zbieranie ocen i własny mały model
+
+Użytkownik potwierdził poprawę renderowania w 0.7.7.2 i zlecił panel/model oraz wcześniejsze zmiany wyszukiwania. Podstawa: d3fee3f3635d310820215b3ef1897e4aac671912. Renderer pozostaje zachowany.
+
+LearningStore zapisuje wyłącznie świadome oceny, LearningService/LearningWorker zbierają je w osobnym procesie i trenują TinyPairModel. Rzeczywista mała sieć NumPy ma około 77 tys. parametrów. Model i dane są przenośne. Panel Uczenie AI ma podział całych PDF-ów, porównanie na odłożonych parach, eksport/import, historię modeli i przerwanie treningu. Nie ma jeszcze danych rzeczywistych użytkownika ani dostarczonych gotowych wag; model powstaje z jego ocen. Minimum 60 ocen z 4 PDF-ów, zgodnie z warunkami readiness(). Niepewne i inne oznaczenia nie uczą geometrii. Cofanie/reassign nie utrwala błędnej grupy.
+
+Domyślny tryb `learned` zastąpił domyślny Base. DINO nadal jest do wyboru w pełnych trybach. OCR nie ładuje DINO podczas tworzenia wzorca w nowym trybie. Dodano niezależny, ograniczony skan podglądu z cache. Mała sieć może odzyskać kandydatów odrzuconych przez geometrię obrazu, wyłącznie do kontroli. Dokładny tekst, kolor, profil i konflikty nadal obowiązują. Nie deklarować zachowania pełnej skuteczności Base na wszystkich projektach bez porównania rzeczywistych dokumentów.
+
+24 małe kontrole PASS (9 wzorca, 6 renderowania, 9 uczenia). Przepływ panel → trening CPU → raport → aktywacja został sprawdzony osobno. 60 świeżych syntetycznych ocen, 10 testowych par: model 5/5 pozytywnych i 0 fałszywych. To test par, nie wynik na AW4/7–10 ani pełnym rzucie. Oryginalne dokumenty nie były obecnie dostępne. docs/learning-078.md zawiera ograniczenia i wyniki.
+
+Następny krok: użytkownik zbiera rzeczywiste poprawne/błędne przykłady i ręczne pominięcia, trenuje z panelu i porównujemy rezultaty na odłożonych PDF-ach. Pełnostronicowa prawda referencyjna/macierze typów i mocniejszy model są dalszymi etapami. Instalator nie pobiera domyślnie Base; wykonuje diagnostykę nowego trybu. Nie wykonywano pełnej historycznej regresji ani instalacji Windows.
+
 # 0.7.7.2 — renderowanie przed panelem uczenia
 
 Podstawa: gałąź 0.7.7, commit 2ebe006d6421872d5d52cc249bdcd463d51acd14. Zmieniono wyłącznie wyświetlanie PDF i kolejkę podglądu. RenderService używa trwałego procesu render_worker, trzech aktywnych stron PDFium i cache kafelków. Rendering nie importuje detektora, OCR, ONNX ani modeli. viewport_tiles tworzy stałą siatkę 512 px, uwzględnia DPI i renderuje brzeg wokół widoku. DrawingView nie usuwa poprzednich kafelków przy przesunięciu. Kafelki mają margines renderowania dla poprawnego próbkowania skanów. Zaznaczanie i analiza pozostały zgodne z 0.7.7.1.

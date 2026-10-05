@@ -9,8 +9,10 @@ from .domain import overlap_metrics
 
 
 class DetectionEngine:
-    def __init__(self,pdf_engine,matcher=None,text_engine=None,feature_matcher=None,visual_encoder=None):
+    def __init__(self,pdf_engine,matcher=None,text_engine=None,feature_matcher=None,visual_encoder=None,learned_model=None,fast=False):
         self.encoder=visual_encoder
+        self.learned_model=learned_model
+        self.fast=fast
         self.pdf=pdf_engine
         self.matcher=matcher or TemplateMatcher()
         self.custom_matcher=matcher is not None
@@ -75,6 +77,13 @@ class DetectionEngine:
                 if not native_stats or not proposals:raise
                 warnings.append("Analiza obrazu niepełna: "+str(exc))
         retrieval_stats={}
+        if self.fast and not self.custom_matcher:
+            from .ai.fast_proposals import propose
+            status('Szybki skan obrazu strony i ponowne użycie cech')
+            extra,notes=propose(self.pdf,path,page,template,source,items,template_items,threshold)
+            warnings.extend(notes)
+            certain=[c['rect'] for c in proposals if c.get('verified')]
+            proposals.extend(c for c in extra if not any(overlap_metrics(c['rect'],r)[0]>.45 for r in certain))
         if self.encoder:
             from .ai.retrieval import VisualRetrieval
             status('Analiza AI: przeszukiwanie wszystkich kafelków strony')
@@ -101,6 +110,8 @@ class DetectionEngine:
         progress(50)
         status("Weryfikacja cech i geometrii kandydatów")
         reference=None
+        learned_reference=None
+        learned_recovered=0
         reference_cache={}
         verified=[];rejected=[]
         for index,candidate in enumerate(proposals):
@@ -126,6 +137,20 @@ class DetectionEngine:
                     reference=mask_text(self.pdf.render(source,template['page'],2.,template.get('raster_rect',template['rect'])),template_items,template.get('raster_rect',template['rect']),2.)
                 partial=verify_partial(self.pdf,path,page,template,reference,candidate,items)
                 if partial:candidate.update(partial)
+            if self.learned_model and (not candidate['verified'] or candidate.get('source') in ('raster','coarse_page')):
+                # Small model can recover proposals rejected by image geometry,
+                # but these are always review items, never automatic quantities.
+                from .ai.learning_images import symbol_crop
+                if learned_reference is None:
+                    ref_box=template.get('raster_rect',template['rect'])
+                    learned_reference=symbol_crop(self.pdf,source,template['page'],ref_box,template_items)
+                patch=symbol_crop(self.pdf,path,page,candidate['rect'],items)
+                probability=self.learned_model.score(learned_reference,patch)
+                candidate['learned_score']=probability
+                if not candidate['verified'] and probability>=self.learned_model.metadata.get('threshold',.9):
+                    candidate.update(verified=True,learned_recovery=True,
+                                     verification_method='learned_pair_review')
+                    learned_recovered+=1
             if candidate["verified"]:
                 verified.append(candidate)
             else:
@@ -180,7 +205,7 @@ class DetectionEngine:
                 "template":template,"coverage_warnings":warnings,"text_items":[i.to_dict() for i in items],
                 "rejected_candidates":rejected,
                 "stages":{"occlusion_label_probes":len(seeds),"partial_occlusion_candidates":sum(bool(c.get("partial_occlusion")) for c in candidates),"generated":len(proposals),"verified":len(candidates),"rejected":len(rejected),
-                          "ai_retrieval":retrieval_stats,"vector_first":bool(signature and vectors),"raster_used":use_raster,
+                          "ai_retrieval":retrieval_stats,"learned_recovered":learned_recovered,"vector_first":bool(signature and vectors),"raster_used":use_raster,
                           "vector_limit_reached":bool(vectors and vectors.get("truncated")),"native_local":native_stats}}
         progress(85)
         status("Łączenie symboli z oznaczeniami tekstowymi")
@@ -255,6 +280,8 @@ class DetectionEngine:
             if state=='MATCH' and profile_state!='MATCH':
                 state,decision_reason=profile_state,profile_reason
             hit['verification_details']['electrical_profile']=candidate_profile
+            if candidate.get('learned_score') is not None:
+                hit['verification_details']['learned_pair_score']=candidate['learned_score']
             hit['verification_details']['expected_electrical_profile']=expected_profile
             if profile_state=='OTHER_VARIANT':
                 hit['label']=display_label(actual,candidate_profile) or actual
@@ -262,6 +289,8 @@ class DetectionEngine:
                 state,decision_reason='REVIEW','uncertain_ocr_label'
             if candidate.get('partial_occlusion') and state!='OTHER_VARIANT':
                 state,decision_reason='REVIEW','partial_occlusion_review'
+            if candidate.get('learned_recovery') and state!='OTHER_VARIANT':
+                state,decision_reason='REVIEW','learned_pair_review'
             if candidate.get('occlusion'):hit['verification_details']['occlusion']=candidate['occlusion']
             hit['text_source']=item.source if item else None
             hit.update(shape_score=graphic,visual_score=visual,label_score=signals['device_label_score'],text_association_score=spatial)
@@ -269,6 +298,8 @@ class DetectionEngine:
             hit.update(signals=signals,confidence=confidence,color_score=signals['color_score'],
                 visual_ai_score=visual,status=state,text_role='DEVICE_LABEL' if actual else 'UNKNOWN',
                 text_role_confidence=signals['text_role_confidence'])
+            if candidate.get('learned_score') is not None:
+                hit['signals']['learned_pair_score']=candidate['learned_score']
             hit['verification_details'].update(associated_texts=association.get('associated_texts',[]),
                 color_signature=candidate_color,final_decision_reason=decision_reason)
             if state=='MATCH':

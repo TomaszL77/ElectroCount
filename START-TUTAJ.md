@@ -1,12 +1,12 @@
 # ElectroCount — drugi komputer
 
-Kod i testy ElectroCount 0.7.7.2. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
+Kod i testy ElectroCount 0.7.8. Windows, Python 3.12 64-bit. Biblioteki pozostają zgodne z runtime 0.7.
 
-Po rozpakowaniu tej aktualizacji uruchamiaj **Uruchom.cmd z nowego folderu**. Stary skrót może uruchamiać wcześniejszy kod. W tytule okna ma być **0.7.7.2**. Jeśli runtime 0.7 już działa, do testu wyświetlania wystarczy Uruchom.cmd. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Otwórz schemat, powiększ i przesuwaj go w różne strony. Nie trzeba ponawiać wyszukiwania, aby sprawdzić renderowanie.
+Po rozpakowaniu tej aktualizacji uruchamiaj **Uruchom.cmd z nowego folderu**. Stary skrót może uruchamiać wcześniejszy kod. W tytule okna ma być **0.7.8**. Jeśli runtime 0.7 już działa, wystarczy Uruchom.cmd. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Panel znajduje się w **Uczenie → Uczenie AI**. Domyślnie oceny zapisują się lokalnie; nowy model powstanie po Twoim treningu.
 
 1. Zaloguj się do GitHuba na swoje konto. W GitHub Desktop wybierz File → Clone repository i repozytorium ElectroCount. Jeśli korzystasz z paczki ZIP, najpierw rozpakuj cały folder do lokalnego katalogu. Po pobraniu aktualizacji zamknij poprzednią aplikację, uruchom Instaluj.cmd i Uruchom.cmd.
 2. Zainstaluj Python 3.12 64-bit z python.org wraz z Python Launcher. Sprawdzenie: `py -3.12 --version`.
-3. Otwórz folder aplikacji i uruchom Instaluj.cmd. Potrzebny jest internet do pobrania bibliotek. Instalator pobiera również lokalne modele DINOv2 i OCR. Używa krótkiej ścieżki %LOCALAPPDATA%/ElectroCount/py312-07 i kończy testem PASS 12/12.
+3. Otwórz folder aplikacji i uruchom Instaluj.cmd. Potrzebny jest internet do pobrania bibliotek. Używa krótkiej ścieżki %LOCALAPPDATA%/ElectroCount/py312-07 i kończy testem PASS 12/12. Duży model DINO Base jest opcjonalny i można pobrać go osobno przez Instaluj_AI.cmd; własny model z panelu nie wymaga GPU ani pobierania z internetu.
 4. Uruchom Uruchom.cmd. Otwórz lokalny PDF. Analiza używa tej samej jakości na każdym komputerze.
 5. W swoim narzędziu do pracy z kodem otwórz ten sam lokalny folder. Przeczytaj CONTINUE.md — opisuje dotychczasowe prace i następne kroki.
 
@@ -30,4 +30,8 @@ Lokalne przykłady wymienione w README mogą być nieobecne w paczce kodu. Testy
 
 ## Testy bieżącej wersji
 
-**Testy.cmd** uruchamia 15 małych kontroli wzorca i renderowania. Testy tworzą nowe syntetyczne dokumenty. Dalszą jakość i płynność na własnym komputerze sprawdza ręcznie użytkownik.
+**Testy.cmd** uruchamia 24 małe kontrole wzorca, renderowania i uczenia. Testy tworzą nowe syntetyczne dokumenty. Dalszą jakość i płynność na własnym komputerze sprawdza ręcznie użytkownik.
+
+## Dane i model na innym komputerze
+
+W panelu Uczenie AI użyj **Eksportuj dane**, a na drugim komputerze **Importuj dane**. Do samego wyszukiwania wystarczy **Eksportuj model**, **Importuj model** i **Użyj tego modelu**. Modele mają rozszerzenie `.ecmodel`. Przeniesienie folderu aplikacji lub aktualizacja z GitHuba nie zastępuje kopii Twojej bazy ocen. Dane są lokalne; nie ma automatycznej synchronizacji chmurowej. Trening korzysta z całej bieżącej bazy uczącej.

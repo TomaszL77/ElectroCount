@@ -15,6 +15,8 @@ from .history import History
 from .jobs import JobManager
 from .render_service import RenderService
 from .viewport_tiles import viewport_tiles
+from .learning_service import LearningService
+from .ai.learning_store import LearningStore
 from .project_manager import ProjectManager
 from .import_ui import ImportWindowMixin
 from .results_manager import ResultsManager
@@ -78,6 +80,10 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.jobs = JobManager(self)
         self.renderer = RenderService(self)
         self.renderer.failed.connect(self.failure)
+        self.learning_store = LearningStore(data_dir() / 'learning')
+        self.learning = LearningService(self.learning_store.directory, self)
+        self.feedback_ids = set()
+        self.learning.failed.connect(lambda message: self.statusBar().showMessage('Uczenie: ' + message, 20000))
         self.jobs.failed.connect(self.failure)
         self.jobs.busy_changed.connect(self.busy_changed)
         self.jobs.progress.connect(lambda v: self.operation_progress.set_progress(v))
@@ -110,7 +116,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             write_json(data_dir()/"logs"/"runtime_info.json",self.startup_runtime)
         plan = self.performance.plan
         self.jobs.performance_plan = plan.to_dict()
-        self.performance_button.setText({'hybrid_base':'AI Base · CPU','hybrid':'AI Small · CPU','classic':'Klasyczny · CPU'}[self.engine_mode()])
+        own = 'Własny AI · CPU' if self.settings_store.text('learning/active_model','') else 'Szybki · zbieranie ocen'
+        self.performance_button.setText({'learned':own,'hybrid_base':'AI Base · CPU','hybrid':'AI Small · CPU','classic':'Klasyczny · CPU'}[self.engine_mode()])
         self.performance_button.setToolTip(f"{plan.reason}\n{self.performance.state}\nJednakowa analiza na każdym komputerze.")
 
     def toggle_artifacts(self):
@@ -144,24 +151,53 @@ class MainWindow(ImportWindowMixin, QMainWindow):
 
     def engine_mode(self):
         from .ai.model_catalog import model_for_mode
-        mode=self.settings_store.text('detection/engine_mode_073','hybrid_base')
+        mode=self.settings_store.text('detection/engine_mode_078','learned')
         model_for_mode(mode)
         return mode
 
     def toggle_hybrid(self):
-        modes={'AI Base — większy model':'hybrid_base','AI Small — lżejszy model':'hybrid',
+        modes={'Szybki + własny model (uczenie)':'learned','AI Base — pełna analiza strony':'hybrid_base','AI Small — pełna analiza strony':'hybrid',
                'Klasyczny — geometria PDF':'classic'}
         labels=list(modes)
         current=list(modes.values()).index(self.engine_mode())
         selected,ok=QInputDialog.getItem(self,'Tryb analizy','Wybierz model do kolejnego wyszukiwania:',labels,current,False)
         if not ok:return
-        self.settings_store.set('detection/engine_mode_073',modes[selected])
+        self.settings_store.set('detection/engine_mode_078',modes[selected])
         self.statusBar().showMessage('Wybrano '+selected+'. Kliknij Znajdź, aby przeliczyć wyniki.',15000)
         self.update_performance()
         self.registry.refresh()
 
     def show_performance(self):
         PerformanceDialog(self.performance,self).exec()
+
+    def show_learning(self):
+        from .learning_panel import LearningPanel
+        if not hasattr(self,'learning_panel'):
+            self.learning_panel=LearningPanel(self)
+        self.learning_panel.show();self.learning_panel.raise_()
+
+    def record_feedback(self, detection, outcome, group=None):
+        if not self.settings_store.get('learning/collect',True):return
+        group=group or next((g for g in self.project.groups if g.id==(detection.group or detection.requested_group)),None)
+        if not group or not group.template:return
+        from copy import deepcopy
+        template=deepcopy(group.template)
+        path,page=self.project.page_location(detection.page)
+        source,source_page=self.project.page_location(template['page'])
+        if outcome=='wrong' and detection.label and group.label and normalize_text(detection.label)!=normalize_text(group.label):
+            outcome='variant'
+        self.feedback_ids.add(detection.id)
+        self.learning.submit({'kind':'capture','template':template,'template_path':source,
+            'template_page':source_page,'path':path,'page':page,'rect':list(detection.rect),
+            'group_id':group.id,'group_name':group.name,'outcome':outcome,
+            'metadata':{'detection_id':detection.id,'label':detection.label,'expected_label':group.label,
+                        'manual':detection.source=='manual'}})
+
+    def assess_selected(self, outcome):
+        detection=self.selected_detection()
+        if detection:
+            self.record_feedback(detection,outcome)
+            self.statusBar().showMessage('Ocena przekazana do bazy przykładów.',8000)
 
     def register_commands(self):
         editable = lambda: bool(self.project.source) and not self.busy and not self.loading
@@ -203,6 +239,9 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("hybrid", "Model analizy: Base / Small / klasyczny…", "settings", self.toggle_hybrid,
                 lambda:not self.busy and not self.loading),
             Command("performance", "Wydajność i sprzęt", "settings", self.show_performance),
+            Command("learning", "Uczenie AI", "settings", self.show_learning),
+            Command("learning_variant", "Oceń: inny wariant", "layers", lambda:self.assess_selected('variant'), selected),
+            Command("learning_uncertain", "Oceń: niepewny", "settings", lambda:self.assess_selected('uncertain'), selected),
             Command("settings", "Próg konfliktu", "settings", self.settings, lambda: not self.busy),
         ]
         for command in commands:
@@ -220,7 +259,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.current_page_only.toggled.connect(lambda value: self.settings_store.set("search/current_page_only",value))
         sections = [("Projekt", ["new", "open", "save"]), ("Widok", ["pan", "fit"]),
                     ("Zliczanie", ["group", "template", "replace_template", "find", "manual"]),
-                    ("Edycja", ["undo", "redo"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "template_legend", "hybrid", "performance"])]
+                    ("Edycja", ["undo", "redo"]), ("Uczenie", ["learning", "learning_variant", "learning_uncertain"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "template_legend", "hybrid", "performance"])]
         for title, keys in sections:
             menu = self.menuBar().addMenu(title)
             if toolbar.actions():
@@ -430,6 +469,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
     def replace_project(self, project, folder):
         self.jobs.clear_render_queue()
         self.renderer.clear()
+        self.feedback_ids.clear()
         self.generation += 1
         self.project, self.folder = project, folder
         self.history, self.dirty, self.selected = History(), False, ""
@@ -776,11 +816,13 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 "selection_context":self.view.last_selection_context,
                 "ocr_enabled":self.engine_mode()!='classic',
                 "model_name":'base' if self.engine_mode()=='hybrid_base' else 'small',
+                "visual_embedding":self.engine_mode() in ('hybrid','hybrid_base'),
                 "debug_dir":str(new_debug_run()) if self.settings_store.get("debug/artifacts",False) else None}, prepared)
         elif self.view.mode == "manual" and group:
             self.checkpoint()
             detection = Detection(group.id, self.project.page, rect, decision="accepted", source="manual")
             self.project.detections.append(detection)
+            self.record_feedback(detection,'correct')
             self.selected = detection.id
             self.set_mode("pan")
             self.refresh()
@@ -824,6 +866,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             "threshold": self.project.threshold,
             "config":{"search_scope":"current_page" if self.current_page_only.isChecked() else "all_pages",
                 "engine_mode":self.engine_mode(),
+                "learned_model":self.settings_store.text('learning/active_model','') if self.engine_mode()=='learned' else '',
                 "pages":indices,"text_filter":"exact_native","ai_mode":"deterministic_cpu","gui_runtime":self.startup_runtime},
             "debug_dir":str(new_debug_run()) if self.settings_store.get("debug/artifacts",False) else None}, ready, analysis=True)
 
@@ -861,6 +904,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             if decision == "accepted" and not detection.group:
                 return
             detection.decision = decision
+            self.record_feedback(detection,'correct' if decision=='accepted' else 'wrong')
             self.refresh()
 
     def reassign(self):
@@ -872,7 +916,10 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         if ok:
             self.checkpoint()
             group = self.project.groups[labels.index(choice)]
+            self.record_feedback(detection,'variant')
             detection.group, self.project.active = group.id, group.id
+            detection.decision='accepted'
+            self.record_feedback(detection,'correct',group)
             self.refresh()
 
     def navigate(self, direction):
@@ -944,18 +991,28 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             self.conflict_list.setCurrentRow(min(row, self.conflict_list.count()-1))
 
     def undo(self):
+        previous_feedback={d.id:(d.group,d.requested_group,d.decision) for d in self.project.detections}
         self.project = self.history.undo(self.project)
         self.dirty = True
-        self.sync_after_history()
+        self.sync_after_history(previous_feedback)
 
     def redo(self):
+        previous_feedback={d.id:(d.group,d.requested_group,d.decision) for d in self.project.detections}
         self.project = self.history.redo(self.project)
         self.dirty = True
-        self.sync_after_history()
+        self.sync_after_history(previous_feedback)
 
-    def sync_after_history(self):
+    def sync_after_history(self, previous_feedback=None):
         self.jobs.clear_render_queue()
         self.renderer.clear()
+        if previous_feedback is not None:
+            current={d.id:(d.group,d.requested_group,d.decision) for d in self.project.detections}
+            changed={i for i in self.feedback_ids if previous_feedback.get(i)!=current.get(i)}
+            states={d.id:{'outcome':('correct' if d.decision=='accepted' else 'wrong' if d.decision=='rejected' else 'uncertain'),
+                          'group_id':d.group or d.requested_group}
+                    for d in self.project.detections if d.id in changed}
+            if changed:
+                self.learning.submit({'kind':'reconcile','assessments':{i:states.get(i,{'outcome':'uncertain','group_id':''}) for i in changed}})
         self.generation += 1
         self.preview_cache.clear()
         self.rebuild_page_list()
@@ -1067,6 +1124,10 @@ class MainWindow(ImportWindowMixin, QMainWindow):
 
 
     def closeEvent(self, event):
+        if self.learning.busy:
+            QMessageBox.information(self,'Uczenie','Trwa zapis ocen lub trening. Poczekaj na zakończenie przed zamknięciem aplikacji.')
+            event.ignore()
+            return
         if self.busy or self.loading:
             QMessageBox.information(self, "Trwa operacja", "Poczekaj na import / przygotowanie wzorca lub anuluj analizę.")
             event.ignore()
@@ -1076,5 +1137,6 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             return
         self.performance.close()
         self.renderer.close()
+        self.learning.close()
         self.jobs.close()
         event.accept()

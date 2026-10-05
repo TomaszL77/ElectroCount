@@ -13,7 +13,7 @@ from .performance import execution_plan
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--self-test', action='store_true')
-    parser.add_argument('--engine-mode', choices=['classic','hybrid','hybrid_base'], default='classic')
+    parser.add_argument('--engine-mode', choices=['classic','learned','hybrid','hybrid_base'], default='learned')
     parser.add_argument('--replay', type=Path)
     parser.add_argument('--pdf', help='New local path to the same document')
     parser.add_argument('--template-pdf', help='New local path if reference is from another document')

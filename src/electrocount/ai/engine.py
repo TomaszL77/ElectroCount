@@ -7,8 +7,8 @@ from .contracts import SignalBreakdown
 
 
 class AIEngine:
-    def __init__(self, pdf_engine, *, detector=None, model_manager=None, context_engine=None, dataset_manager=None,visual_encoder=None):
-        self.detector = detector or DetectionEngine(pdf_engine,visual_encoder=visual_encoder)
+    def __init__(self, pdf_engine, *, detector=None, model_manager=None, context_engine=None, dataset_manager=None,visual_encoder=None,learned_model=None,fast=False):
+        self.detector = detector or DetectionEngine(pdf_engine,visual_encoder=visual_encoder,learned_model=learned_model,fast=fast)
         self.models = model_manager
         self.context = context_engine or ContextEngine()
         self.dataset = dataset_manager or TrainingDatasetManager()
@@ -25,5 +25,14 @@ class AIEngine:
             result['pipeline']['inactive'].remove('neural_encoder')
             result['pipeline']['model']={'name':self.detector.encoder.name,'revision':self.detector.encoder.version}
         result['pipeline']['engine_mode']=('hybrid_base' if self.detector.encoder.model_key=='base' else 'hybrid') if getattr(self.detector,'encoder',None) else 'classic'
+        if getattr(self.detector,'fast',False):
+            result['pipeline']['engine_mode']='learned'
+            result['pipeline']['inactive'].remove('training_collection')
+            result['pipeline']['active']+=['human_feedback_collection']
+            model=getattr(self.detector,'learned_model',None)
+            if model:
+                result['pipeline']['active']+=['learned_pair_mlp']
+                result['pipeline']['model']={'name':'electrocount-pair-mlp','revision':model.metadata.get('id')}
+            result['pipeline']['confidence_kind']='heuristic; learned_pair_score is uncalibrated'
         result['pipeline']['application_profile']='electrical-takeoff-v1'
         return result

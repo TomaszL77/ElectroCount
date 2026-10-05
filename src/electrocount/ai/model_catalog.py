@@ -26,10 +26,9 @@ MODELS = {
     'base': EncoderSpec('base','31ef06cac16d5d301c5930d147002a058c85a5e4',
         '320d1012a6fc65b101fc85ca30ee7a47b2e4f6a2e8bd78fb9d7036def0e30cb0',346627111,768,86),
 }
-ENGINE_MODES = {'classic':None, 'hybrid':'small', 'hybrid_base':'base'}
+ENGINE_MODES = {'classic':None, 'learned':None, 'hybrid':'small', 'hybrid_base':'base'}
 
 
 def model_for_mode(mode):
     if mode not in ENGINE_MODES:raise ValueError(f'Nieznany tryb analizy: {mode}')
     return ENGINE_MODES[mode]
-
