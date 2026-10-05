@@ -93,7 +93,7 @@ class DrawingView(QGraphicsView):
         if event.button() == Qt.MouseButton.LeftButton:
             if self.mode != "pan":
                 self.start_screen = event.position()
-                self.start_point = self.mapToScene(event.position().toPoint())
+                self.start_point = self.viewportTransform().inverted()[0].map(event.position())
                 self.rubber = self.scene().addRect(QRectF(self.start_point, self.start_point),
                     QPen(QColor("#29d8c1"), 0), QBrush(QColor(41, 216, 193, 30)))
                 self.rubber.setZValue(20)
@@ -106,7 +106,7 @@ class DrawingView(QGraphicsView):
 
     def mouseMoveEvent(self, event):
         if self.start_point is not None and self.rubber:
-            rect = QRectF(self.start_point, self.mapToScene(event.position().toPoint())).normalized()
+            rect = QRectF(self.start_point, self.viewportTransform().inverted()[0].map(event.position())).normalized()
             self.rubber.setRect(rect.intersected(self.page_rect))
             return
         super().mouseMoveEvent(event)
@@ -114,7 +114,7 @@ class DrawingView(QGraphicsView):
     def mouseReleaseEvent(self, event):
         if self.start_point is not None and self.rubber:
             # Recompute at release: Windows can coalesce/drop the last move event.
-            rect = QRectF(self.start_point,self.mapToScene(event.position().toPoint())).normalized().intersected(self.page_rect)
+            rect = QRectF(self.start_point,self.viewportTransform().inverted()[0].map(event.position())).normalized().intersected(self.page_rect)
             screen=QRectF(self.start_screen,event.position()).normalized()
             dpr=self.viewport().devicePixelRatioF();zoom=self.transform().m11()
             self.last_selection_context={

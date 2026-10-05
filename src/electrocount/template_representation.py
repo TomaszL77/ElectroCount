@@ -32,18 +32,20 @@ class TemplateRepresentation:
     source: str
 
 
-def crop_record(image, bbox):
+def crop_record(image, bbox, scale=2.0):
     pixels=cv2.cvtColor(image,cv2.COLOR_GRAY2BGR) if image.ndim==2 else cv2.cvtColor(image,cv2.COLOR_RGB2BGR)
     ok, encoded = cv2.imencode('.png', pixels)
     if not ok: raise ValueError('Nie udało się zapisać wzorca')
-    return {'png_base64':base64.b64encode(encoded).decode(),'bbox':list(bbox),'scale':2.0,'color_space':'RGB'}
+    return {'png_base64':base64.b64encode(encoded).decode(),'bbox':list(bbox),'scale':scale,'color_space':'RGB'}
 
 
 def build_representation(pdf, path, page, template):
     items=pdf.extract_text(path,page)
     selection=template.get('selection_bbox',template.get('selection_rect',template['rect']))
     rect=template.get('matching_bbox',template.get('raster_rect',template['rect']))
-    original=pdf.render(path,page,2.,selection)
+    # Render small selections sharply; keep exact bounds and limit memory use.
+    original_scale=max(2.,min(12.,152./max(min(selection[2:]),.1),2048./max(selection[2:])))
+    original=pdf.render(path,page,original_scale,selection)
     visual=mask_text(pdf.render(path,page,2.,rect),items,rect,2.)
     x,y,w,h=template['rect'];margin=max(24.,max(w,h)*2.5)
     meta=pdf.inspect(path)[page]
@@ -60,7 +62,7 @@ def build_representation(pdf, path, page, template):
     record=asdict(TemplateRepresentation(
         id=template['id'],group_id=template.get('group_id'),selection_bbox=list(selection),
         matching_bbox=list(rect),symbol_bbox=template.get('symbol_bbox'),context_bbox=context,
-        original_rgb_crop=crop_record(original,selection),normalized_visual_crop=crop_record(gray,rect),
+        original_rgb_crop=crop_record(original,selection,original_scale),normalized_visual_crop=crop_record(gray,rect),
         color_signature=color_signature(visual),geometry_signature=template.get('signature'),
         visual_features={'kind':'shape_summary','embedding':None,
             'hu_moments':cv2.HuMoments(cv2.moments((gray<205).astype(np.uint8))).ravel().tolist(),

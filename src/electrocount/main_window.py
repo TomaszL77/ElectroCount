@@ -739,6 +739,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 if target.possible_label:
                     info += f" · Możliwe oznaczenie: {target.possible_label}"
                 if replacing:info='Zastąpiono wzorzec. Kliknij Znajdź, aby ponownie zweryfikować wyniki.'
+                if template.get("preparation_warnings"):
+                    info += " · " + " · ".join(template["preparation_warnings"])
                 self.statusBar().showMessage(info,15000)
                 self.set_mode("pan")
                 self.refresh()

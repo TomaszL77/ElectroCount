@@ -1,3 +1,13 @@
+# Aktualizacja 0.7.7.1 — 5 października 2026
+
+Poprawiono blokadę widoczną na zrzucie użytkownika. Self-match ocenia detektor, nie poprawność zaznaczenia: jego niepowodzenie jest teraz ostrzeżeniem, nie wyjątkiem anulującym wzorzec. Wynik false pozostaje zapisany; nie tworzymy sztucznych detekcji. Na syntetycznym PDF odtworzono przypadek poprawnego magentowego koła, którego segmenty są zbyt krótkie dla kotwicy lokalnego matchera.
+
+Oryginalny wycinek zachowuje dokładne selection_bbox i RGB. Małe wycinki są renderowane do 12 px/pt z limitem rozmiaru; rzeczywista skala jest zapisana w rekordzie. Dopasowywanie nadal używa oddzielnego obrazu. Podgląd skaluje obraz z zachowaniem proporcji i wygładzaniem. Usunięto zaokrąglanie współrzędnych myszy przed przeliczeniem do przestrzeni PDF.
+
+9 PASS (0,84 s): pięć dotychczasowych kontroli z aktualizacją oczekiwanego zachowania self-match, rzeczywisty przypadek małego koła wraz z pikselowym porównaniem wycinka i odtworzeniem podglądu po JSON, trzy powiększenia przy przeciąganiu w przeciwnym kierunku i bez zdarzenia mouseMove. Nie uruchamiano pełnej regresji. Brak oryginalnego PDF ze zrzutu i próby instalacji Windows.
+
+Poniższy opis dotyczy historycznej wersji 0.7.7; blokowanie wzorca przez self-match zostało zastąpione powyższym zachowaniem.
+
 # 0.7.7 — etap 1, 3 października 2026
 
 ## Przyczyna

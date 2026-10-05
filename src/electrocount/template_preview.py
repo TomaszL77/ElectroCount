@@ -16,7 +16,7 @@ class TemplatePreview(QWidget):
         crop=representation.get('original_rgb_crop') or representation.get('visual_crop',{})
         self.original=QImage.fromData(base64.b64decode(crop['png_base64'])) if crop.get('png_base64') else QImage()
         self.setVisible(bool(template and (not self.original.isNull() or template.get('signature'))))
-        self.setToolTip('Dokładne zaznaczenie użytkownika. Oznaczenie może być analizowane osobno.')
+        self.setToolTip('Dokładne zaznaczenie użytkownika. Oznaczenie może być analizowane osobno.' + '\n' + '\n'.join((template or {}).get('preparation_warnings',[])))
         if template:
             from .electrical_profile import display_label
             self.label=display_label(label,template.get('electrical_profile',{}))
@@ -27,6 +27,7 @@ class TemplatePreview(QWidget):
         signature=self.template.get('signature')
         if not signature and self.original.isNull():return
         painter=QPainter(self);painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
         painter.fillRect(QRectF(0,2,88,76),QColor('#f7fafc'))
         if not self.original.isNull():
             fitted=self.original.size().scaled(76,64,Qt.KeepAspectRatio)

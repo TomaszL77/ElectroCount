@@ -8,6 +8,21 @@ from .vector_engine import VectorCandidateGenerator
 
 
 def validate_self_match(pdf,path,page,template):
+    """Diagnostic only: matcher limitations must not discard a valid RGB selection."""
+    try:
+        _validate_self_match(pdf,path,page,template)
+    except (ValueError, RuntimeError, AttributeError, cv2.error) as exc:
+        template['self_check']=False
+        template['self_match']={'passed':False,'method':'local_search','error':str(exc)}
+    if not template['self_check']:
+        template['preparation_warnings']=list(template.get('preparation_warnings',[]))
+        warning='Zapisano dokładne zaznaczenie. Test rozpoznawania źródła nie powiódł się — sprawdź wyniki wyszukiwania.'
+        if warning not in template['preparation_warnings']:
+            template['preparation_warnings'].append(warning)
+    return template['self_match']
+
+
+def _validate_self_match(pdf,path,page,template):
     signature=template.get('signature')
     items=pdf.extract_text(path,page)
     if signature and hasattr(pdf,'open_vector_page'):
@@ -34,5 +49,3 @@ def validate_self_match(pdf,path,page,template):
         method='local_raster_search'
     template['self_check']=matched
     template['self_match']={'passed':matched,'method':method}
-    if not matched:
-        raise ValueError('Błąd tworzenia wzorca: wzorzec nie rozpoznaje własnego elementu źródłowego. Zaznaczenie nie zostało zmienione.')

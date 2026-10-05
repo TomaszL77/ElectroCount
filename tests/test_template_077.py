@@ -1,4 +1,4 @@
-"""Five fresh, small checks for stage 1. No historical PDF or saved detections."""
+"""Focused selection and preview checks. No historical PDF or saved detections."""
 import base64
 import cv2
 import numpy as np
@@ -85,5 +85,53 @@ def test_5_self_match_finds_source_and_rejects_broken_template(tmp_path,monkeypa
     assert any(overlap_metrics(h['rect'],t['symbol_bbox'])[0]>.95 for h in r['legend_matches'])
     assert not r['matches']  # source exemplar isn't added to the takeoff
     monkeypatch.setattr(VectorCandidateGenerator,'find',lambda *a,**kw:[])
-    with pytest.raises(ValueError,match='Błąd tworzenia wzorca'):
-        validate_self_match(pdf,path,0,t)
+    validate_self_match(pdf,path,0,t)
+    assert not t['self_match']['passed']
+    assert t['preparation_warnings']
+    # A failed matcher must not prevent creating a new, exact selection.
+    prepared=prepare_detection(pdf,path,0,SELECTION)
+    assert prepared['representation']['original_rgb_crop']==t['representation']['original_rgb_crop']
+    assert not prepared['self_check']
+
+
+def test_small_symbol_self_match_failure_keeps_sharp_original(tmp_path,app):
+    from electrocount.template_preview import TemplatePreview
+    path=tmp_path/'tiny.pdf'
+    c=canvas.Canvas(str(path),pagesize=(100,100))
+    c.setStrokeColorRGB(1,0,1);c.setLineWidth(.15);c.circle(50,50,.6)
+    c.save();pdf=PdfiumEngine();box=[48.125,48.25,3.75,3.5]
+    t=prepare_detection(pdf,str(path),0,box)
+    # The vector anchor requires a segment >1pt; this valid circle has none.
+    assert not t['self_check'] and t['preparation_warnings']
+    rep=t['representation'];record=rep['original_rgb_crop']
+    raw=base64.b64decode(record['png_base64'])
+    decoded=cv2.cvtColor(cv2.imdecode(np.frombuffer(raw,np.uint8),cv2.IMREAD_COLOR),cv2.COLOR_BGR2RGB)
+    assert record['scale']==12 and record['bbox']==box
+    assert np.array_equal(decoded,pdf.render(str(path),0,record['scale'],box))
+    assert np.any((decoded[:,:,0]>200)&(decoded[:,:,1]<100)&(decoded[:,:,2]>200))
+    import json
+    restored=json.loads(json.dumps(t))
+    preview=TemplatePreview();preview.set_template(restored);preview.resize(300,82)
+    assert not preview.original.isNull() and preview.grab().width()==300
+    assert 'Test rozpoznawania' in preview.toolTip()
+
+
+@pytest.mark.parametrize('zoom',[.5,2.,8.])
+def test_fractional_drag_preserves_exact_scene_selection(app,zoom):
+    from PySide6.QtCore import QPointF,Qt
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtCore import QEvent
+    from electrocount.drawing_view import DrawingView
+    view=DrawingView();view.resize(600,500);view.set_page(1000,1000)
+    view.resetTransform();view.scale(zoom,zoom);view.set_mode('template')
+    view.show();app.processEvents()
+    start=QPointF(250.75,230.25);end=QPointF(150.125,130.875)
+    inverse=view.viewportTransform().inverted()[0]
+    from PySide6.QtCore import QRectF
+    expected=QRectF(inverse.map(start),inverse.map(end)).normalized().intersected(view.page_rect)
+    emitted=[];view.rectangle_selected.connect(emitted.append)
+    view.mousePressEvent(QMouseEvent(QEvent.MouseButtonPress,start,start,Qt.LeftButton,Qt.LeftButton,Qt.NoModifier))
+    # Release without a move event, as can happen on Windows.
+    view.mouseReleaseEvent(QMouseEvent(QEvent.MouseButtonRelease,end,end,Qt.LeftButton,Qt.NoButton,Qt.NoModifier))
+    assert emitted==[[expected.x(),expected.y(),expected.width(),expected.height()]]
+    view.close()
