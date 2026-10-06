@@ -1,3 +1,7 @@
+# 0.7.8.3 — ramki z osobnych wypełnionych konturów i oprawy bez kodów
+
+Podstawa: 0.7.8.2, commit e2dcd475782f85e3134505c28972eed952c51a0b. Nowy tryb kształtu i koloru jest jawnie włączany przez użytkownika; pełne rozróżnienie oznaczeń pozostaje domyślne. Szczegóły: docs/lighting-0783.md. Modele, dane ocen i PDF-y użytkownika pozostają poza repozytorium.
+
 # 0.7.8.2 — klipy CAD, katalog gniazd, model wstępny
 
 Podstawa: 0.7.8.1, commit 2f2bbf40fe9651b0171bc33fcdc44db2faceb53e. Szczegóły: docs/sockets-0782.md. socket_symbols.py nie zawiera współrzędnych ani nazw dokumentów. Katalog użytkownika pochodzi z legendy projektu; zamknięte/sieciowe symbole wymagają jawnego socket_kind w sygnaturze. Domyślnie rozpoznawany jest tylko charakterystyczny korpus półkolisty. Model wstępny rozdziela fizyczne lokalizacje, a nie udaje niezależnych PDF-ów. Wycinki, modele użytkownika i dokumenty nie należą do repozytorium.

@@ -104,3 +104,19 @@ def test_embedded_legend_excludes_only_its_examples(tmp_path,monkeypatch):
     template['reference_page_only']=True
     result=socket_symbols.catalogue_results(native,[entry])[0]['result']
     assert not result['matches'] and not result['review']
+
+
+def test_separate_filled_triangles_do_not_fill_frame_interior():
+    triangles=[[(0,0),(100,0),(100,1),(0,0)],[(0,0),(100,1),(0,1),(0,0)],
+               [(0,99),(100,99),(100,100),(0,99)],[(0,99),(100,100),(0,100),(0,99)]]
+    frame=path(triangles[0],1,True)
+    frame['segments']=[segment for triangle in triangles for segment in path(triangle,1,True)['segments']]
+    frame['bbox']=[0,0,100,100]
+    assert not intersects_selection(frame,[30,30,20,20])
+    assert intersects_selection(frame,[30,0,20,20])
+
+
+def test_explicit_shape_color_mode_distinguishes_gray_architecture():
+    from electrocount.detection_engine import color_matches
+    assert color_matches({'foreground_color':[0,0,0]},{'foreground_color':[20,20,20]})
+    assert not color_matches({'foreground_color':[0,0,0]},{'foreground_color':[128,128,128]})

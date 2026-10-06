@@ -155,6 +155,15 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         model_for_mode(mode)
         return mode
 
+    def toggle_shape_color(self):
+        group=self.project.active_group()
+        if not group or not group.template or self.busy or self.loading:return
+        self.checkpoint()
+        enabled=group.template.get('match_mode')!='shape_color'
+        group.template['match_mode']='shape_color' if enabled else 'full'
+        self.statusBar().showMessage('Wzorzec: '+('kształt i kolor, bez wymagania oznaczenia tekstowego.' if enabled else 'pełna analiza z oznaczeniem tekstowym.'),15000)
+        self.registry.refresh()
+
     def toggle_reference_page(self):
         group=self.project.active_group()
         if not group or not group.template:return
@@ -263,6 +272,9 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("template_legend", "Wzorzec pochodzi z legendy", "template", self.toggle_template_legend,
                 lambda:active() and bool(self.project.active_group().template),
                 checked=lambda:bool(self.project.active_group() and self.project.active_group().template and self.project.active_group().template.get('source')=='LEGEND')),
+            Command("shape_color", "Wzorzec bez oznaczenia: kształt i kolor", "template", self.toggle_shape_color,
+                lambda:active() and bool(self.project.active_group().template) and not self.busy and not self.loading,
+                checked=lambda:bool(self.project.active_group() and self.project.active_group().template and self.project.active_group().template.get('match_mode')=='shape_color')),
             Command("reference_page", "Cała strona wzorca jest legendą", "template", self.toggle_reference_page,
                 lambda:active() and bool(self.project.active_group().template) and self.project.active_group().template.get('source')=='LEGEND',
                 checked=lambda:bool(self.project.active_group() and self.project.active_group().template and self.project.active_group().template.get('reference_page_only'))),
@@ -289,13 +301,13 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.current_page_only.toggled.connect(lambda value: self.settings_store.set("search/current_page_only",value))
         sections = [("Projekt", ["new", "open", "save"]), ("Widok", ["pan", "fit"]),
                     ("Zliczanie", ["group", "template", "replace_template", "find", "socket_catalogue", "manual"]),
-                    ("Edycja", ["undo", "redo"]), ("Uczenie", ["learning", "learning_variant", "learning_uncertain"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "template_legend", "reference_page", "hybrid", "performance"])]
+                    ("Edycja", ["undo", "redo"]), ("Uczenie", ["learning", "learning_variant", "learning_uncertain"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "template_legend", "shape_color", "reference_page", "hybrid", "performance"])]
         for title, keys in sections:
             menu = self.menuBar().addMenu(title)
             if toolbar.actions():
                 toolbar.addSeparator()
             for key in keys:
-                if key not in ("replace_template","debug","artifacts","diagnostic_test","debug_folder","template_legend","reference_page","hybrid","performance"):
+                if key not in ("replace_template","debug","artifacts","diagnostic_test","debug_folder","template_legend","shape_color","reference_page","hybrid","performance"):
                     toolbar.addAction(self.registry.actions[key])
                 if key=="find":
                     toolbar.addWidget(self.current_page_only)
@@ -686,6 +698,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         if group and group.possible_label:
             menu.addAction("Akceptuj możliwe oznaczenie "+group.possible_label,self.accept_possible_label)
         menu.addAction("Duplikuj konfigurację", self.duplicate_group)
+        menu.addAction(self.registry.actions["shape_color"])
         menu.addAction(self.registry.actions["find"])
         menu.addSeparator()
         menu.addAction("Usuń grupę", self.delete_group)

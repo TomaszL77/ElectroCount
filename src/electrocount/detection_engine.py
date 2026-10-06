@@ -30,7 +30,10 @@ class DetectionEngine:
             template['source']=previous.get('source',template['source'])
             template['group_id']=previous.get('group_id',previous.get('representation',{}).get('group_id'))
             template['id']=previous.get('id',previous.get('representation',{}).get('id'))
-        expected=normalize_text(label or template.get("label",""))
+        shape_color=template.get('match_mode')=='shape_color'
+        expected='' if shape_color else normalize_text(label or template.get("label",""))
+        if template.get('signature') and template.get('source')=='LEGEND':
+            template['signature']['source_legend']=True
         if not self.custom_matcher and hasattr(self.pdf,'open_vector_page'):
             from .socket_symbols import definition, catalogue_results
             if definition(template.get('signature')) is not None:
@@ -118,7 +121,7 @@ class DetectionEngine:
                 item=association.get('item')
                 if item and item.source=='pdf_native':explained.add(tuple(item.bbox))
             seed_items=[i for i in items if tuple(i.bbox) not in explained]
-        seeds=[] if self.custom_matcher else label_proposals(template,expected,seed_items,self.pdf.inspect(path)[page])
+        seeds=[] if self.custom_matcher or shape_color else label_proposals(template,expected,seed_items,self.pdf.inspect(path)[page])
         proposals.extend(seeds)
         progress(50)
         status("Weryfikacja cech i geometrii kandydatów")
@@ -191,6 +194,9 @@ class DetectionEngine:
         ocr=None
 
         for candidate in verified:
+            if shape_color:
+                candidate['association_result']={'item':None,'score':0.,'reason':'shape_color_mode','associated_texts':[]}
+                continue
             layout=None if template.get('source')=='LEGEND' else template.get('association')
             options=[self.text.associate(candidate['rect'],text_index,
                 transformed_layout(layout,candidate.get('rotation',0),candidate.get('scale',1)))]
@@ -205,7 +211,7 @@ class DetectionEngine:
             candidate['association_result']=chosen
         # Learn repeated layout from unambiguous neighbors on this page, never
         # from the requested label. Legend typography/rotation is often different.
-        if template.get('source')=='LEGEND':
+        if template.get('source')=='LEGEND' and not shape_color:
             from .text_layout import resolve_repeated_layout
             resolve_repeated_layout(verified,self.text,text_index)
         candidates=[]
@@ -215,7 +221,7 @@ class DetectionEngine:
                 candidates.append(candidate)
         # Resolve geometric duplicates before expensive OCR. OCR is independent
         # of DINOv2; exact native associations never get overwritten.
-        if not self.custom_matcher and any(not c['association_result']['item'] for c in candidates):
+        if not shape_color and not self.custom_matcher and any(not c['association_result']['item'] for c in candidates):
             from .ocr_engine import OCREngine
             ocr=OCREngine()
             status('OCR: sprawdzanie kandydatów bez tekstu PDF')
@@ -241,6 +247,11 @@ class DetectionEngine:
         if not template.get('representation',{}).get('original_rgb_crop'):
             template['representation']=build_representation(self.pdf,source,template['page'],template)
         reference_color=template['representation']['color_signature']
+        if shape_color and signature:
+            colors=[tuple(p.get('color',[])[:3]) for p in signature['paths']
+                    if len(p.get('color',[]))>=3 and min(p['color'][:3])<245]
+            if colors:
+                reference_color={**reference_color,'foreground_color':list(Counter(colors).most_common(1)[0][0])}
         reference_embedding=None
         if self.encoder:
             from dataclasses import asdict
@@ -280,6 +291,9 @@ class DetectionEngine:
             if candidate_color is None or self.encoder:
                 patch=mask_text(self.pdf.render(path,page,2.,crop_box),items,crop_box,2.)
                 if candidate_color is None:candidate_color=color_signature(patch)
+            if shape_color and not color_matches(reference_color,candidate_color):
+                result['rejected_candidates'].append({'rect':candidate['rect'],'status':'REJECTED','reason':'different_foreground_color'})
+                continue
             visual=None
             if self.encoder:
                 from .ai.visual_encoder import cosine
@@ -373,3 +387,10 @@ class DetectionEngine:
         status("Kończenie analizy strony")
         progress(100)
         return result
+
+
+def color_matches(reference,candidate,tolerance=40):
+    """Explicit shape/color mode keeps gray architecture out of black symbols."""
+    import numpy as np
+    a=reference.get('foreground_color');b=candidate.get('foreground_color')
+    return a is not None and b is not None and float(np.max(np.abs(np.asarray(a,float)-np.asarray(b,float))))<=tolerance

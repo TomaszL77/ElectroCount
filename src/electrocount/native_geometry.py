@@ -132,8 +132,21 @@ def intersects_selection(path,rect):
         elif line(segment['points'][0],segment['points'][-1]):return True
     if path.get('fill'):
         import cv2
-        polygon=np.concatenate([sample_segment(s) for s in path['segments']]).astype(np.float32)
-        if any(cv2.pointPolygonTest(polygon,p,False)>=0 for p in ((x,y),(x+w,y),(x,y+h),(x+w,y+h))):return True
+        # CAD frames may be one path made of separate filled triangles.
+        # Joining their contours invents filled diagonals across the page.
+        contours=[];current=[]
+        for segment in path['segments']:
+            points=sample_segment(segment).tolist()
+            if current and math.dist(current[-1],points[0])>.001:
+                contours.append(current);current=[]
+            current.extend(points if not current else points[1:])
+            if len(current)>=3 and math.dist(current[0],current[-1])<.001:
+                contours.append(current);current=[]
+        if current:contours.append(current)
+        for contour in contours:
+            if len(contour)<3:continue
+            polygon=np.asarray(contour,np.float32)
+            if any(cv2.pointPolygonTest(polygon,p,False)>=0 for p in ((x,y),(x+w,y),(x,y+h),(x+w,y+h))):return True
     return False
 
 
