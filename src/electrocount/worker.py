@@ -59,6 +59,29 @@ def execute(request, plan):
             found["pipeline"]["execution"] = {**plan.to_dict(),**request.get('config',{})}
             results.append({"page":page["page"],"result":found})
         return {"pages":results,"cache_hits":engine.hits}
+    if kind=='socket_catalogue':
+        from .socket_symbols import catalogue_results
+        from .detection_service import result_signature
+        pages=request['pages'];results=[]
+        for index,page in enumerate(pages):
+            emit({'status':f"Gniazda: strona {index+1}/{len(pages)} · pełne kształty i typy"})
+            with engine.open_vector_page(page['path'],page['source_page']) as native:
+                found=catalogue_results(native,request['entries'],
+                    lambda p,index=index:emit({'progress':round((index+p/100)*100/len(pages))}))
+            model_path=request.get('config',{}).get('learned_model')
+            if model_path:
+                from .ai.tiny_model import TinyPairModel
+                from .socket_symbols import score_review_pairs
+                try:
+                    model=TinyPairModel.load(model_path)
+                    score_review_pairs(engine,page['path'],page['source_page'],found,request['entries'],model)
+                except (OSError,ValueError,KeyError) as exc:
+                    for row in found:row['result']['coverage_warnings'].append('Mały model niedostępny: '+str(exc))
+            for row in found:
+                row['page']=page['page']
+                row['result']['result_sha256']=result_signature(row['result'])
+                results.append(row)
+        return {'pages':results,'cache_hits':engine.hits}
     if kind=="match":
         result = run_detection(engine,request["path"],request["page"],request["template"],
             request.get("label",""),request["threshold"],lambda v:emit({"progress":v}),request.get("template_path"),status=lambda stage:emit({"status":stage}),config=plan.to_dict(),debug_dir=request.get('debug_dir'))

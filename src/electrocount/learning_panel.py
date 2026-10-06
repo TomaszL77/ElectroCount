@@ -22,7 +22,7 @@ class LearningPanel(QDialog):
         self.resize(1120, 820)
         layout = QVBoxLayout(self)
         help_text = QLabel('Otwórz PDF, zaznacz wzorzec i wyszukaj. Akceptuj poprawne trafienia, odrzucaj błędne '
-                          'i dodawaj pominięcia ręcznie. Tylko Twoje oceny trafiają do nauki. '
+                          'i dodawaj pominięcia ręcznie. Do nauki trafiają ocenione przykłady, także z importu. '
                           'Przycisk zbiorczy dodaje pozycje „Sprawdź” z całego bieżącego projektu. '
                           '„Do oceny”, „Inny wariant” i „Niepewny” nie są używane do treningu.')
         help_text.setWordWrap(True); layout.addWidget(help_text)
@@ -110,7 +110,13 @@ class LearningPanel(QDialog):
         self.add_review_button.setEnabled(self.collect.isChecked() and not self.window.busy and not self.window.loading
                                          and not (self.service.current and self.service.current['kind']=='train'))
         ready, reason = self.store.readiness()
-        self.ready.setText(reason + ' Każdy PDF należy w całości do jednego podziału. Zalecane: co najmniej 4 różne dokumenty.')
+        self.preliminary=False
+        if not ready:
+            ready_preliminary,preliminary_reason=self.store.preliminary_readiness()
+            if ready_preliminary:
+                ready=True;reason=preliminary_reason;self.preliminary=True
+        self.train_button.setText('Wytrenuj wstępnie' if self.preliminary else 'Wytrenuj model')
+        self.ready.setText(reason + (' Do pełnej kontroli zbieraj oceny z kolejnych PDF-ów.' if self.preliminary else ' Każdy PDF należy w całości do jednego podziału. Zalecane: co najmniej 4 różne dokumenty.'))
         self.train_button.setEnabled(ready and not self.service.busy and not self.window.busy and not self.window.loading)
         self.cancel_button.setEnabled(bool(self.service.current and self.service.current['kind']=='train'))
         for button in self.file_buttons: button.setEnabled(not self.service.busy)
@@ -156,7 +162,7 @@ class LearningPanel(QDialog):
             self.store.split_document(row['document'], SPLITS[self.split.currentIndex()]); self.refresh()
 
     def train(self):
-        self.progress.setValue(0); self.service.submit({'kind': 'train'})
+        self.progress.setValue(0); self.service.submit({'kind': 'train','preliminary':self.preliminary})
 
     def selected_model(self):
         filename = self.versions.currentData()
@@ -170,7 +176,8 @@ class LearningPanel(QDialog):
         report = next((r for r in self.reports if r['model_file'] == path.name), None)
         if not report: return
         labels = {'classic': 'Geometria obrazu', 'model': 'Mały model', 'combined': 'Suma propozycji'}
-        text = 'PORÓWNANIE OCENIONYCH WYCINKÓW — nie kompletność całego rysunku\n'
+        text = ('NAUKA WSTĘPNA — inne lokalizacje w tych samych PDF-ach; brak testu na nowym dokumencie.\n'
+                if report.get('preliminary') else 'PORÓWNANIE OCENIONYCH WYCINKÓW — nie kompletność całego rysunku\n')
         for key, metric in report['comparisons'].items():
             text += (f"{labels[key]}: poprawnie {metric['tp']}, pominięte {metric['fn']}, fałszywe {metric['fp']}; "
                      f"precyzja {metric['precision']:.1%}, wykrycie poprawnych par {metric['recall']:.1%}\n")

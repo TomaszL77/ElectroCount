@@ -151,6 +151,16 @@ class LearningStore:
         with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as archive:
             archive.writestr('examples.json', payload)
 
+    def preliminary_readiness(self):
+        rows=[r for r in self.examples(False) if r['split']=='train']
+        for outcome in ('correct','wrong'):
+            count=sum(r['outcome']==outcome for r in rows)
+            if count<20:return False,'Nauka wstępna wymaga 20 poprawnych i 20 błędnych kształtów ocenionych w zbiorze uczenia.'
+        locations={(r['document'],r['page'],tuple(round(v,3) for v in r['rect'])) for r in rows
+                   if r['outcome'] in ('correct','wrong')}
+        if len(locations)<30:return False,'Nauka wstępna wymaga co najmniej 30 różnych lokalizacji przykładów.'
+        return True,'Możliwa nauka wstępna. Kontrola na innych wycinkach tych samych PDF-ów; bez potwierdzenia skuteczności na nowym dokumencie.'
+
     def import_data(self, path):
         with zipfile.ZipFile(path) as archive:
             info = archive.getinfo('examples.json')

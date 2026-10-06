@@ -13,7 +13,9 @@ from .text_engine import prepare_template
 def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_context=None, ocr_enabled=False, model_name='small', visual_embedding=True):
     try:
         template = prepare_template(pdf, path, page, selection)
-        if not template.get('label') and (ocr_enabled or not pdf.extract_text(path,page)):
+        from .socket_symbols import definition
+        outlined_socket=definition(template.get('signature')) is not None
+        if not outlined_socket and not template.get('label') and (ocr_enabled or not pdf.extract_text(path,page)):
             from .ocr_engine import OCREngine,TextOverridePDF
             native=pdf.extract_text(path,page)
             recognized=OCREngine().read_region(pdf,path,page,template['rect'],native)

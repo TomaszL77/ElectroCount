@@ -31,6 +31,19 @@ class DetectionEngine:
             template['group_id']=previous.get('group_id',previous.get('representation',{}).get('group_id'))
             template['id']=previous.get('id',previous.get('representation',{}).get('id'))
         expected=normalize_text(label or template.get("label",""))
+        if not self.custom_matcher and hasattr(self.pdf,'open_vector_page'):
+            from .socket_symbols import definition, catalogue_results
+            if definition(template.get('signature')) is not None:
+                status('Sprawdzanie pełnych kształtów gniazd i oznaczeń wariantów')
+                with self.pdf.open_vector_page(path,page) as native:
+                    results=catalogue_results(native,[{'group_id':'active','template':template,'label':expected,'template_path':source}],progress,strict=True)
+                if self.learned_model:
+                    from .socket_symbols import score_review_pairs
+                    score_review_pairs(self.pdf,path,page,results,
+                        [{'group_id':'active','template':template,'template_path':source}],self.learned_model)
+                result=results[0]['result']
+                progress(100)
+                return result
         items=self.pdf.extract_text(path,page)
         template_items=items if source==path and page==template["page"] else self.pdf.extract_text(source,template["page"])
         progress(5)

@@ -37,7 +37,7 @@ class OperationProgress(QFrame):
         self.title.setText({'import':'Otwieranie dokumentów','template':'Przygotowanie wzorca'}.get(kind,'Wyszukiwanie elementów'))
         self.stage.setText('Uruchamianie analizy…')
         self.bar.setRange(0,0)
-        self.cancel.setVisible(kind in ('match','batch_match'));self.cancel.setEnabled(True);self.cancel.setText('Anuluj analizę')
+        self.cancel.setVisible(kind in ('match','batch_match','socket_catalogue'));self.cancel.setEnabled(True);self.cancel.setText('Anuluj analizę')
         self.clock.start();self._tick();self.timer.start();self.show()
 
     def set_progress(self,value):

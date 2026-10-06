@@ -1,19 +1,19 @@
-# ElectroCount 0.7.8.1 — własny mały model AI
+# ElectroCount 0.7.8.2 — własny mały model AI
 
 Panel **Uczenie → Uczenie AI** zapisuje Twoje oceny, uruchamia lokalny trening i porównuje modele na odłożonych przykładach. Dane i modele można eksportować na drugi komputer. Zachowano ostre renderowanie kafelkowe i dokładny podgląd zaznaczenia z 0.7.7.2.
 
-W tej aktualizacji dodano **Dodaj wszystkie ze Sprawdź do oceny**, maskowanie białego otoczenia oraz odzyskiwanie mocnych kształtów do ręcznej weryfikacji. [Opis zmian 0.7.8.1](docs/learning-0781.md).
+Poprawiono odczyt klipów CAD, rozróżnianie pełnych kształtów i oznaczeń gniazd, dodano **Wszystkie typy gniazd** oraz **Wytrenuj wstępnie** dla pierwszego PDF-u. [Opis zmian 0.7.8.2](docs/sockets-0782.md).
 
 ## Uruchomienie
 
-Rozpakuj wersję do nowego folderu i uruchom **Uruchom.cmd z tego folderu**. W oknie musi być **0.7.8.1**. Jeśli działa runtime 0.7, nie musisz ponownie pobierać bibliotek ani dużego modelu. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Instalator domyślnie nie pobiera DINO Base; Instaluj_AI.cmd pozostaje opcją dla pełnego, dotychczasowego trybu.
+Rozpakuj wersję do nowego folderu i uruchom **Uruchom.cmd z tego folderu**. W oknie musi być **0.7.8.2**. Jeśli działa runtime 0.7, nie musisz ponownie pobierać bibliotek ani dużego modelu. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Instalator domyślnie nie pobiera DINO Base; Instaluj_AI.cmd pozostaje opcją dla pełnego, dotychczasowego trybu.
 
 ## Nauka podczas pracy
 
 1. Otwórz PDF, zaznacz wzorzec i wyszukaj.
 2. **Akceptuj** poprawne elementy, **Odrzuć** błędne kształty, **Dodaj ręcznie** pominięcia. Oceny zapisują się automatycznie.
 3. Otwórz **Uczenie → Uczenie AI**, sprawdź wycinki i podział dokumentów.
-4. Zbierz przykłady z co najmniej czterech PDF-ów. Panel pokazuje, czego jeszcze brakuje do treningu.
+4. Po pierwszych ocenach możesz użyć **Wytrenuj wstępnie**. Do pełnej kontroli na niezależnych dokumentach zbieraj przykłady z co najmniej czterech PDF-ów. Panel pokazuje wymagania.
 5. Kliknij **Wytrenuj model**, obejrzyj wynik i wybierz **Użyj tego modelu**.
 
 Pierwsza baza jest pusta. Model nauczy się na Twoich ocenach; aplikacja nie dostarcza losowych wag jako gotowej wiedzy. Minimum do pierwszej próby: 20 poprawnych + 20 błędnych do uczenia z dwóch PDF-ów, 5 + 5 do walidacji z osobnego PDF-u i 5 + 5 do testu z kolejnego. Pozycje „Do oceny” oraz oceny „inny wariant” i „niepewny” pozostają zapisane, ale nie uczą geometrii.

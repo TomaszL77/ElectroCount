@@ -58,7 +58,7 @@ class JobManager(QObject):
         process.outcome = None
         process.cancelled = False
         process.handled = False
-        foreground = request["kind"] in ("import","template","batch_match","match","self_test")
+        foreground = request["kind"] in ("import","template","batch_match","match","self_test","socket_catalogue")
 
         def read():
             process.buffer += bytes(process.readAllStandardOutput())
@@ -135,4 +135,3 @@ class JobManager(QObject):
                 process.cancelled = True
                 process.kill()
                 process.waitForFinished(3000)
-

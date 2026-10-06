@@ -17,13 +17,30 @@ def metrics(y, scores, threshold=.5):
                 count=len(truth))
 
 
-def train(directory, progress=lambda p: None, status=lambda s: None, epochs=80):
+def train(directory, progress=lambda p: None, status=lambda s: None, epochs=80, preliminary=False):
     store = LearningStore(directory)
-    ready, reason = store.readiness()
+    ready, reason = store.preliminary_readiness() if preliminary else store.readiness()
     if not ready:
         raise ValueError(reason)
     rows = [r for r in store.examples() if r['outcome'] in ('correct', 'wrong')]
     splits = {split: [r for r in rows if r['split'] == split] for split in ('train', 'validation', 'test')}
+    if preliminary:
+        # Only use the user-designated learning PDFs. Never consume existing
+        # held-out documents to bootstrap a model. All pairs at one physical
+        # location stay together; multiple references cannot leak a crop.
+        rows=[r for r in rows if r['split']=='train']
+        locations={hashlib.sha256(repr((r['document'],r['page'],tuple(round(v,3) for v in r['rect']))).encode()).hexdigest()
+                   for r in rows}
+        ordered=sorted(locations)
+        assignments={key:('train' if i<len(ordered)*.7 else 'validation' if i<len(ordered)*.85 else 'test')
+                     for i,key in enumerate(ordered)}
+        splits={s:[] for s in ('train','validation','test')}
+        for row in rows:
+            key=hashlib.sha256(repr((row['document'],row['page'],tuple(round(v,3) for v in row['rect']))).encode()).hexdigest()
+            splits[assignments[key]].append(row)
+        for records in splits.values():
+            if not records or len({r['outcome'] for r in records})<2:
+                raise ValueError('Za mało zróżnicowanych lokalizacji do kontroli nauki wstępnej. Dodaj kolejne ocenione przykłady.')
     status('Przygotowanie ocenionych przykładów…')
     datasets = {}
     for split, records in splits.items():
@@ -51,7 +68,7 @@ def train(directory, progress=lambda p: None, status=lambda s: None, epochs=80):
     candidates = [(t, metrics(vy, vs, t)) for t in thresholds]
     suitable = [(t, m) for t, m in candidates if m['precision'] >= .98 and m['tp'] > 0]
     threshold = max(suitable, key=lambda item: (item[1]['recall'], -item[0]))[0] if suitable else .9
-    status('Porównanie na odłożonych dokumentach testowych…')
+    status('Kontrola na odłożonych lokalizacjach tych samych PDF-ów…' if preliminary else 'Porównanie na odłożonych dokumentach testowych…')
     tx, ty = datasets['test']
     inference_start = time.monotonic(); scores = model.predict(tx)
     model_ms = (time.monotonic() - inference_start) * 1000
@@ -82,6 +99,13 @@ def train(directory, progress=lambda p: None, status=lambda s: None, epochs=80):
                  'model_batch_ms': model_ms, 'classic_crop_ms': classic_ms},
         measurement='human-labelled visual pairs; not whole-page detection recall',
         auto_activated=False)
+    report.update(preliminary=preliminary,
+        example_ids={s:[r['id'] for r in records] for s,records in splits.items()},
+        assessment_origins=sorted({r.get('metadata',{}).get('assessment_origin','user') for r in rows}),
+        validation_scope='same_document_locations' if preliminary else 'independent_documents',
+        generalization_verified=not preliminary,
+        limitation='Nauka wstępna: wycinki pochodzą z tych samych PDF-ów. Wynik nie potwierdza działania na nowym dokumencie.' if preliminary else '')
+    if preliminary:report['measurement']='visually assessed pairs at held-out locations in the same documents; not whole-page completeness or new-document generalization'
     model.metadata.update(id=model_id, threshold=threshold, report=report)
     output = Path(directory) / 'models' / (model_id + '.ecmodel')
     model.save(output)

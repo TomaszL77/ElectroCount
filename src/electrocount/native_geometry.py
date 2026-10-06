@@ -64,10 +64,13 @@ def _clip_preserves_geometry(obj,value,converter):
     if count<=0:return True
     for index in range(count):
         n=pdfium.raw.FPDFClipPath_CountPathSegments(clip,index)
-        if n not in (4,5):return False
+        # CAD exporters often repeat collinear vertices along a rectangular
+        # page clip. Segment count is not the polygon's number of corners.
+        if n<4 or n>512:return False
         points=[]
         for j in range(n):
             segment=pdfium.raw.FPDFClipPath_GetPathSegment(clip,index,j)
+            if j and pdfium.raw.FPDFPathSegment_GetType(segment)==pdfium.raw.FPDF_SEGMENT_MOVETO:return False
             if pdfium.raw.FPDFPathSegment_GetType(segment)==pdfium.raw.FPDF_SEGMENT_BEZIERTO:return False
             x,y=ctypes.c_float(),ctypes.c_float()
             if not pdfium.raw.FPDFPathSegment_GetPoint(segment,x,y):return False
@@ -76,8 +79,7 @@ def _clip_preserves_geometry(obj,value,converter):
                 x,y=parent.get_matrix().on_point(x,y);parent=parent.container
             a,b=converter.to_bitmap(x,y);points.append((a/1000,b/1000))
         if points[-1]==points[0]:points.pop()
-        if len(points)!=4:return False
-        polygon=np.asarray(points,np.float32)
+        polygon=cv2.approxPolyDP(np.asarray(points,np.float32),.001,True).reshape(-1,2)
         if not cv2.isContourConvex(polygon):return False
         if any(cv2.pointPolygonTest(polygon,tuple(pt),True)<-.002
                for segment in value['segments'] for pt in segment['points']):return False
@@ -101,6 +103,40 @@ def deduplicate(paths):
     return list(unique.values())
 
 
+def intersects_selection(path,rect):
+    """An enclosing stroked frame's bounds do not mean it paints the selection."""
+    x,y,w,h=rect
+    pad=path.get('stroke_width',0)/2 if path.get('stroke') else 0
+    left,top,right,bottom=x-pad,y-pad,x+w+pad,y+h+pad
+    def line(a,b):
+        lo,hi=0.,1.
+        for start,end,lower,upper in zip(a,b,(left,top),(right,bottom)):
+            delta=end-start
+            if abs(delta)<1e-12:
+                if start<lower or start>upper:return False
+            else:
+                u,v=(lower-start)/delta,(upper-start)/delta
+                lo=max(lo,min(u,v));hi=min(hi,max(u,v))
+                if lo>hi:return False
+        return True
+    def curve(points,depth=0):
+        p=np.asarray(points)
+        if p[:,0].max()<left or p[:,0].min()>right or p[:,1].max()<top or p[:,1].min()>bottom:return False
+        if depth>=12:return True  # conservative: unresolved contact keeps the path
+        if all(left<=v[0]<=right and top<=v[1]<=bottom for v in p):return True
+        a=(p[:-1]+p[1:])/2;b=(a[:-1]+a[1:])/2;c=(b[0]+b[1])/2
+        return curve([p[0],a[0],b[0],c],depth+1) or curve([c,b[1],a[2],p[3]],depth+1)
+    for segment in path['segments']:
+        if segment['kind']=='curve':
+            if curve(segment['points']):return True
+        elif line(segment['points'][0],segment['points'][-1]):return True
+    if path.get('fill'):
+        import cv2
+        polygon=np.concatenate([sample_segment(s) for s in path['segments']]).astype(np.float32)
+        if any(cv2.pointPolygonTest(polygon,p,False)>=0 for p in ((x,y),(x+w,y),(x,y+h),(x+w,y+h))):return True
+    return False
+
+
 class NativeVectorPage:
     """Owns native handles for one operation; no handles survive page.close().
 
@@ -108,6 +144,7 @@ class NativeVectorPage:
     with thousands of points cost the same as rectangles until queried.
     """
     def __init__(self,path,page_index,max_segments=40000,max_paths=1000000,cache_directory=None):
+        self.source_path=str(Path(path).resolve());self.page_index=page_index
         self.doc=pdfium.PdfDocument(path);self.page=self.doc[page_index]
         self.max_segments=max_segments;self.max_paths=max_paths
         w,h=self.page.get_size();self.size=(w,h)
@@ -221,6 +258,7 @@ class NativeVectorPage:
         ids=np.flatnonzero((b[:,0]<x+w)&(b[:,1]<y+h)&
             (b[:,0]+b[:,2]>x)&(b[:,1]+b[:,3]>y))
         paths=self.decode(ids,preserve=True)
+        if paths is not None:paths=[p for p in paths if intersects_selection(p,selection)]
         from .text_engine import intersection
         if any(intersection(selection,r)>0 for r in self.image_regions):return None
         if not paths or self.truncated or any(int(i) in self.clipped for i in ids):return None
@@ -424,6 +462,11 @@ def connected_geometry(reference,paths,anchor):
     # the style grouping. Keep it so the fill gate sees the effective variant.
     for p in without_paint_caps(original_paths):
         if p.get('fill') and not any(p is q for q in selected) and any(max(abs(a-b) for a,b in zip(p['bbox'],q['bbox']))<.15 for q in selected):selected.append(p)
+        # A disconnected inner arc/stroke of the same device paint is a
+        # variant feature, not background. Keep it even without endpoint contact.
+        if (not any(p is q for q in selected) and contains(anchor['bbox'],p['bbox'],.15)
+                and p.get('color',[])[:3]==anchor.get('color',[])[:3]
+                and abs(p.get('stroke_width',0)-anchor.get('stroke_width',0))<.02):selected.append(p)
     return deduplicate(selected)
 
 
@@ -451,5 +494,8 @@ def paint_group(reference,paths,anchor):
         es=p['segments']
         closed=3<=len(es)<=8 and np.linalg.norm(np.array(es[0]['points'][0])-es[-1]['points'][-1])<.15
         link=len(es)==1 and all(attached(pt) for pt in (es[0]['points'][0],es[0]['points'][-1]))
-        if closed or link:group.append(p)
+        inner=(contains(anchor['bbox'],p['bbox'],.15) and
+               p.get('color',[])[:3]==anchor.get('color',[])[:3] and
+               abs(p.get('stroke_width',0)-anchor.get('stroke_width',0))<.02)
+        if closed or link or inner:group.append(p)
     return deduplicate(group)

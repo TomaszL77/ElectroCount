@@ -1,3 +1,7 @@
+# 0.7.8.2 — klipy CAD, katalog gniazd, model wstępny
+
+Podstawa: 0.7.8.1, commit 2f2bbf40fe9651b0171bc33fcdc44db2faceb53e. Szczegóły: docs/sockets-0782.md. socket_symbols.py nie zawiera współrzędnych ani nazw dokumentów. Katalog użytkownika pochodzi z legendy projektu; zamknięte/sieciowe symbole wymagają jawnego socket_kind w sygnaturze. Domyślnie rozpoznawany jest tylko charakterystyczny korpus półkolisty. Model wstępny rozdziela fizyczne lokalizacje, a nie udaje niezależnych PDF-ów. Wycinki, modele użytkownika i dokumenty nie należą do repozytorium.
+
 # 0.7.8.1 — kolejka Sprawdź, bez białego otoczenia, mocniejsze kształty
 
 Podstawa: 0.7.8, commit 83c8bcc3d8aff4c4b70445733a8efbf0b53db31f. Dodano przycisk zbiorczego dodania wszystkich nowych review z projektu do bazy jako pending (Do oceny), bez nadpisywania istniejących ocen lub treningu na nieocenionych przykładach. Zapis pozostaje w osobnym procesie; odświeżenia tabeli są grupowane.

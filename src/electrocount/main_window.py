@@ -155,6 +155,17 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         model_for_mode(mode)
         return mode
 
+    def toggle_reference_page(self):
+        group=self.project.active_group()
+        if not group or not group.template:return
+        self.checkpoint()
+        page=group.template['page']
+        enabled=not group.template.get('reference_page_only',False)
+        for other in self.project.groups:
+            if other.template and other.template['page']==page:other.template['reference_page_only']=enabled
+        self.statusBar().showMessage('Cała strona wzorca '+('wyłączona ze zliczania jako legenda.' if enabled else 'ponownie dostępna do zliczania; pomijane są tylko wzorce z legendy.'),15000)
+        self.registry.refresh()
+
     def toggle_hybrid(self):
         modes={'Szybki + własny model (uczenie)':'learned','AI Base — pełna analiza strony':'hybrid_base','AI Small — pełna analiza strony':'hybrid',
                'Klasyczny — geometria PDF':'classic'}
@@ -227,6 +238,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("replace_template", "Wybierz czysty wzorzec tej grupy…", "template", self.replace_template, lambda: active() and bool(self.project.active_group().template)),
             Command("template", "Wzorzec", "template", lambda: self.set_mode("template"), editable, description="Zaznacz symbol wraz z oznaczeniem tekstowym", checked=lambda: hasattr(self, "view") and self.view.mode == "template"),
             Command("find", "Znajdź", "search", self.find_matches, lambda: active() and bool(self.project.active_group().template)),
+            Command("socket_catalogue", "Wszystkie typy gniazd", "search", self.find_socket_catalogue,
+                    lambda: bool(self.project.pages) and not self.busy and not self.loading and any(g.template for g in self.project.groups)),
             Command("manual", "Dodaj ręcznie", "manual", lambda: self.set_mode("manual"), active, checked=lambda: hasattr(self, "view") and self.view.mode == "manual"),
             Command("undo", "Cofnij", "undo", self.undo, lambda: editable() and bool(self.history.undo_stack), "Ctrl+Z"),
             Command("redo", "Ponów", "redo", self.redo, lambda: editable() and bool(self.history.redo_stack), "Ctrl+Y"),
@@ -250,6 +263,9 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("template_legend", "Wzorzec pochodzi z legendy", "template", self.toggle_template_legend,
                 lambda:active() and bool(self.project.active_group().template),
                 checked=lambda:bool(self.project.active_group() and self.project.active_group().template and self.project.active_group().template.get('source')=='LEGEND')),
+            Command("reference_page", "Cała strona wzorca jest legendą", "template", self.toggle_reference_page,
+                lambda:active() and bool(self.project.active_group().template) and self.project.active_group().template.get('source')=='LEGEND',
+                checked=lambda:bool(self.project.active_group() and self.project.active_group().template and self.project.active_group().template.get('reference_page_only'))),
             Command("hybrid", "Model analizy: Base / Small / klasyczny…", "settings", self.toggle_hybrid,
                 lambda:not self.busy and not self.loading),
             Command("performance", "Wydajność i sprzęt", "settings", self.show_performance),
@@ -272,14 +288,14 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.current_page_only.setToolTip("Gdy wyłączone: wszystkie strony wszystkich dokumentów projektu.")
         self.current_page_only.toggled.connect(lambda value: self.settings_store.set("search/current_page_only",value))
         sections = [("Projekt", ["new", "open", "save"]), ("Widok", ["pan", "fit"]),
-                    ("Zliczanie", ["group", "template", "replace_template", "find", "manual"]),
-                    ("Edycja", ["undo", "redo"]), ("Uczenie", ["learning", "learning_variant", "learning_uncertain"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "template_legend", "hybrid", "performance"])]
+                    ("Zliczanie", ["group", "template", "replace_template", "find", "socket_catalogue", "manual"]),
+                    ("Edycja", ["undo", "redo"]), ("Uczenie", ["learning", "learning_variant", "learning_uncertain"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "template_legend", "reference_page", "hybrid", "performance"])]
         for title, keys in sections:
             menu = self.menuBar().addMenu(title)
             if toolbar.actions():
                 toolbar.addSeparator()
             for key in keys:
-                if key not in ("replace_template","debug","artifacts","diagnostic_test","debug_folder","template_legend","hybrid","performance"):
+                if key not in ("replace_template","debug","artifacts","diagnostic_test","debug_folder","template_legend","reference_page","hybrid","performance"):
                     toolbar.addAction(self.registry.actions[key])
                 if key=="find":
                     toolbar.addWidget(self.current_page_only)
@@ -883,6 +899,41 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 "learned_model":self.settings_store.text('learning/active_model','') if self.engine_mode()=='learned' else '',
                 "pages":indices,"text_filter":"exact_native","ai_mode":"deterministic_cpu","gui_runtime":self.startup_runtime},
             "debug_dir":str(new_debug_run()) if self.settings_store.get("debug/artifacts",False) else None}, ready, analysis=True)
+
+
+    def find_socket_catalogue(self):
+        from copy import deepcopy
+        from .socket_symbols import definition
+        entries=[];reference_pages=set()
+        for group in self.project.groups:
+            if not group.template or definition(group.template.get('signature')) is None:continue
+            template=deepcopy(group.template)
+            source,source_page=self.project.page_location(template['page'])
+            if template.get('source')=='LEGEND' and template.get('reference_page_only'):reference_pages.add((source,source_page))
+            template['page']=source_page
+            entries.append({'group_id':group.id,'template':template,'label':group.label,'template_path':source})
+        if not entries:
+            self.statusBar().showMessage('Dodaj grupy i zaznacz w legendzie pełne wzorce gniazd z oznaczeniami.',20000)
+            return
+        indices=[self.project.page] if self.current_page_only.isChecked() else range(len(self.project.pages))
+        pages=[{'page':i,'path':self.project.page_location(i)[0],'source_page':self.project.page_location(i)[1]}
+               for i in indices if self.project.page_location(i) not in reference_pages]
+        if not pages:
+            self.statusBar().showMessage('Wybrana strona jest źródłem legendy. Wybierz stronę instalacji.',15000)
+            return
+        generation=self.generation
+        def ready(batch):
+            if generation!=self.generation:return
+            self.checkpoint()
+            for entry in batch['pages']:
+                ResultsManager().apply(self.project,entry['group_id'],entry['page'],entry['result'])
+            self.refresh()
+            matched=sum(len(e['result']['matches']) for e in batch['pages'])
+            review=sum(len(e['result']['review']) for e in batch['pages'])
+            self.statusBar().showMessage(f'Gniazda: {matched} z rozpoznanym typem · {review} do sprawdzenia typu.',25000)
+        self.jobs.submit({'kind':'socket_catalogue','pages':pages,'entries':entries,
+            'config':{'engine_mode':self.engine_mode(),
+                'learned_model':self.settings_store.text('learning/active_model','') if self.engine_mode()=='learned' else ''}},ready,analysis=True)
 
 
     def selected_detection(self):

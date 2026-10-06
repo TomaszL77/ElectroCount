@@ -50,6 +50,7 @@ def main():
                     result = capture(request, pdf)
                 elif request['kind'] == 'train':
                     result = train(request['directory'],
+                        preliminary=request.get('preliminary',False),
                         progress=lambda p: emit({'progress': p}),
                         status=lambda s: emit({'status': s}))
                 elif request['kind'] == 'reconcile':
