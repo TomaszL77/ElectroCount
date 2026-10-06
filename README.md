@@ -1,13 +1,14 @@
-# ElectroCount 0.7.8.3 — własny mały model AI
+# ElectroCount 0.7.8.4 — własny mały model AI
 
-0.7.8.3: poprawiono odczyt wypełnionych ramek CAD i dodano opcję **Ustawienia → Wzorzec bez oznaczenia: kształt i kolor** dla opraw bez kodów. Szczegóły: [docs/lighting-0783.md](docs/lighting-0783.md).
+0.7.8.4: poprawiono błąd zapisu liczb NumPy (`int64`) i obsługę przyciętej ramki arkusza. Dodano jawny tryb **sam kształt** dla wzorców bez kodu, także w szarych kopiach. Szczegóły: [docs/json-0784.md](docs/json-0784.md).
+0.7.8.4: poprawiono odczyt wypełnionych ramek CAD i dodano opcję **Ustawienia → Wzorzec bez oznaczenia: kształt i kolor** dla opraw bez kodów. Szczegóły: [docs/lighting-0783.md](docs/lighting-0783.md).
 Panel **Uczenie → Uczenie AI** zapisuje Twoje oceny, uruchamia lokalny trening i porównuje modele na odłożonych przykładach. Dane i modele można eksportować na drugi komputer. Zachowano ostre renderowanie kafelkowe i dokładny podgląd zaznaczenia z 0.7.7.2.
 
-Poprawiono odczyt klipów CAD, rozróżnianie pełnych kształtów i oznaczeń gniazd, dodano **Wszystkie typy gniazd** oraz **Wytrenuj wstępnie** dla pierwszego PDF-u. [Opis zmian 0.7.8.3](docs/sockets-0782.md).
+Poprawiono odczyt klipów CAD, rozróżnianie pełnych kształtów i oznaczeń gniazd, dodano **Wszystkie typy gniazd** oraz **Wytrenuj wstępnie** dla pierwszego PDF-u. [Opis zmian 0.7.8.4](docs/sockets-0782.md).
 
 ## Uruchomienie
 
-Rozpakuj wersję do nowego folderu i uruchom **Uruchom.cmd z tego folderu**. W oknie musi być **0.7.8.3**. Jeśli działa runtime 0.7, nie musisz ponownie pobierać bibliotek ani dużego modelu. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Instalator domyślnie nie pobiera DINO Base; Instaluj_AI.cmd pozostaje opcją dla pełnego, dotychczasowego trybu.
+Rozpakuj wersję do nowego folderu i uruchom **Uruchom.cmd z tego folderu**. W oknie musi być **0.7.8.4**. Jeśli działa runtime 0.7, nie musisz ponownie pobierać bibliotek ani dużego modelu. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Instalator domyślnie nie pobiera DINO Base; Instaluj_AI.cmd pozostaje opcją dla pełnego, dotychczasowego trybu.
 
 ## Nauka podczas pracy
 

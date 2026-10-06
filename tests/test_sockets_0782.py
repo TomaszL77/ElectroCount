@@ -120,3 +120,30 @@ def test_explicit_shape_color_mode_distinguishes_gray_architecture():
     from electrocount.detection_engine import color_matches
     assert color_matches({'foreground_color':[0,0,0]},{'foreground_color':[20,20,20]})
     assert not color_matches({'foreground_color':[0,0,0]},{'foreground_color':[128,128,128]})
+
+
+def test_numpy_json_preserves_numeric_values_in_results_and_projects(tmp_path,capsys):
+    import json
+    from electrocount.json_values import dumps
+    from electrocount.worker import emit
+    from electrocount.domain import Project,Group,Detection
+    from electrocount.project_manager import ProjectManager
+    value={'count':np.int64(7),'score':np.float32(.75),'rect':np.array([1,2,3,4]),'ok':np.bool_(True)}
+    decoded=json.loads(dumps(value))
+    assert decoded=={'count':7,'score':.75,'rect':[1,2,3,4],'ok':True}
+    emit({'result':value});assert json.loads(capsys.readouterr().out)['result']==decoded
+    project=Project(groups=[Group('fixture')],detections=[Detection('',np.int64(0),[np.int64(1),2,3,4],signals=value)])
+    ProjectManager().save(project,tmp_path/'project')
+    restored=ProjectManager().load(tmp_path/'project/project.sqlite')
+    assert restored.detections[0].signals==decoded and restored.detections[0].page==0
+
+
+def test_clipped_enclosing_frame_does_not_block_clean_symbol(tmp_path):
+    filename=tmp_path/'frame.pdf';c=canvas.Canvas(str(filename),pagesize=(200,200))
+    c.saveState();clip=c.beginPath();clip.rect(0,0,200,200);c.clipPath(clip,stroke=0)
+    c.rect(-2,-2,204,204,stroke=1,fill=0);c.circle(80,80,5,stroke=1,fill=0)
+    c.restoreState();c.save()
+    with NativeVectorPage(str(filename),0) as native:
+        value=native.template_signature([74,114,12,12])
+        assert native.clipped
+        assert value and len(value['paths'])==1

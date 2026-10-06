@@ -163,7 +163,7 @@ class NativeVectorPage:
         w,h=self.page.get_size();self.size=(w,h)
         self.converter=pdfium.PdfPosConv(self.page,(0,0,round(w*1000),round(h*1000),0))
         self.parents={};self.nested={};self.image_regions=[];self.has_images=False;self.truncated=False;self.decoded=0;self.index_cache_hit=False
-        self.cache={};self.cache_segments=0;self.limited_queries=0;self.clipped=set();self.clipped_info={}
+        self.cache={};self.cache_segments=0;self.clipped_geometry_segments=0;self.limited_queries=0;self.clipped=set();self.clipped_info={}
         source=Path(path);stat=source.stat()
         key=hashlib.sha256(json.dumps(['native-v077-selection',str(source.resolve()),stat.st_size,stat.st_mtime_ns,page_index,max_paths]).encode()).hexdigest()
         self.cache_file=Path(cache_directory)/(key+'.npz') if cache_directory else None
@@ -254,8 +254,11 @@ class NativeVectorPage:
                 obj=pdfium.PdfObject(raw,page=self.page,container=self.parents.get(i))
                 value=_decode(obj,self.converter);self.decoded+=1
                 if value and not _clip_preserves_geometry(obj,value,self.converter):
+                    keep_geometry=len(value['segments'])<=512 and self.clipped_geometry_segments+len(value['segments'])<=min(40000,self.max_segments)
                     self.clipped_info[i]={'segment_count':len(value['segments']),'bbox':value['bbox'],
-                                          'chromatic':chromatic(value)}
+                                          'chromatic':chromatic(value),
+                                          'geometry':value if keep_geometry else None}
+                    if keep_geometry:self.clipped_geometry_segments+=len(value['segments'])
                     value=None;self.clipped.add(i)
                 if value:value['id']=i
                 if self.cache_segments+self.index[i,5]>self.max_segments:
@@ -274,7 +277,10 @@ class NativeVectorPage:
         if paths is not None:paths=[p for p in paths if intersects_selection(p,selection)]
         from .text_engine import intersection
         if any(intersection(selection,r)>0 for r in self.image_regions):return None
-        if not paths or self.truncated or any(int(i) in self.clipped for i in ids):return None
+        relevant_clips=[int(i) for i in ids if int(i) in self.clipped and
+            (not self.clipped_info[int(i)].get('geometry') or
+             intersects_selection(self.clipped_info[int(i)]['geometry'],selection))]
+        if not paths or self.truncated or relevant_clips:return None
         if any(not contains(selection,p['bbox'],.001) for p in paths):return None
         value=signature(paths,preserve_selection=True)
         if value:

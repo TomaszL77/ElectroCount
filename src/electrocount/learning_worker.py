@@ -1,4 +1,5 @@
 """Persistent collector/trainer, isolated from the GUI and viewer process."""
+from .json_values import dumps as json_dumps
 import hashlib
 import json
 import sys
@@ -15,7 +16,7 @@ DIGESTS = {}
 
 
 def emit(message):
-    print(json.dumps(message, ensure_ascii=True), flush=True)
+    print(json_dumps(message, ensure_ascii=True), flush=True)
 
 
 def capture(request, pdf):

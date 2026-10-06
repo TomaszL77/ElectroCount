@@ -3,6 +3,7 @@
 No project-global classes: predicts visual equivalence of two symbol crops.
 Exact device text remains an independent rule in the detector.
 """
+from ..json_values import dumps as json_dumps
 import json
 from pathlib import Path
 import cv2
@@ -99,7 +100,7 @@ class TinyPairModel:
         temporary = path.with_suffix('.tmp')
         with temporary.open('wb') as stream:
             np.savez_compressed(stream, w1=self.w1, b1=self.b1, w2=self.w2, b2=self.b2,
-                                metadata=np.frombuffer(json.dumps(self.metadata).encode(), dtype=np.uint8))
+                                metadata=np.frombuffer(json_dumps(self.metadata).encode(), dtype=np.uint8))
         temporary.replace(path)
 
     @classmethod

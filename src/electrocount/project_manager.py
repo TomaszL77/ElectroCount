@@ -1,4 +1,5 @@
 """Version 2: portable, transactional multi-document projects. Version 1 remains readable."""
+from .json_values import dumps as json_dumps
 import hashlib
 import json
 import logging
@@ -43,7 +44,7 @@ class ProjectManager:
         with sqlite3.connect(folder / "project.sqlite") as db:
             db.execute("CREATE TABLE IF NOT EXISTS snapshot (id INTEGER PRIMARY KEY CHECK(id=1), version INTEGER NOT NULL, payload TEXT NOT NULL)")
             db.execute("INSERT OR REPLACE INTO snapshot VALUES (1, ?, ?)",
-                       (self.VERSION, json.dumps(data, ensure_ascii=False)))
+                       (self.VERSION, json_dumps(data, ensure_ascii=False)))
         logging.info("Project saved: %s; documents=%d", folder.name, len(data["documents"]))
 
     def load(self, filename):

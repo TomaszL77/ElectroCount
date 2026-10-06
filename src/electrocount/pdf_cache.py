@@ -1,4 +1,5 @@
 """Bounded, local cache shared by workers. Source stat and adapter version invalidate entries."""
+from .json_values import dumps as json_dumps
 import hashlib
 import json
 import os
@@ -24,7 +25,7 @@ class CachedPDFEngine:
     def _call(self, method, path, *args):
         source = Path(path)
         stat = source.stat()
-        raw = json.dumps(["v077-selection", getattr(self.engine,"cache_namespace","default"), str(source.resolve()),stat.st_size,stat.st_mtime_ns,method,args], sort_keys=True)
+        raw = json_dumps(["v077-selection", getattr(self.engine,"cache_namespace","default"), str(source.resolve()),stat.st_size,stat.st_mtime_ns,method,args], sort_keys=True)
         key = hashlib.sha256(raw.encode()).hexdigest()
         if key in self.memory:
             self.hits += 1
@@ -51,7 +52,7 @@ class CachedPDFEngine:
                             np.save(stream,value,allow_pickle=False)
                     else:
                         data = [i.to_dict() for i in value] if method == "extract_text" else value
-                        temp.write_text(json.dumps(data),encoding="utf-8")
+                        temp.write_text(json_dumps(data),encoding="utf-8")
                     temp.replace(filename)
                     self.writes += 1
                     if self.writes % 20 == 0:

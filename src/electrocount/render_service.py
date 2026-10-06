@@ -1,4 +1,5 @@
 """Viewer-only process, latest-viewport queue, and bounded shared pixmap cache."""
+from .json_values import dumps as json_dumps
 import json
 import logging
 import sys
@@ -91,7 +92,7 @@ class RenderService(QObject):
         request['id'] = uuid4().hex
         request['output'] = str(Path(self.temp.path()) / (request['id'] + '.png'))
         self.current = (request, callback, key)
-        self.process.write((json.dumps(request, ensure_ascii=True) + '\n').encode())
+        self.process.write((json_dumps(request, ensure_ascii=True) + '\n').encode())
 
     def read(self):
         self.buffer += bytes(self.process.readAllStandardOutput())

@@ -1,4 +1,5 @@
 """Single application entry point for GUI workers, diagnostics and regression tests."""
+from .json_values import dumps as json_dumps
 from pathlib import Path
 import hashlib
 import json
@@ -62,7 +63,7 @@ def result_signature(result):
     data = {bucket: sorted(([round(x, 3) for x in h['rect']], h['label'])
                           for h in result.get(bucket, []))
             for bucket in ('matches', 'legend_matches', 'review', 'discovered_other_label')}
-    return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+    return hashlib.sha256(json_dumps(data, sort_keys=True).encode()).hexdigest()
 
 
 def run_detection(pdf, path, page, template, label='', threshold=.82, progress=lambda p:None,

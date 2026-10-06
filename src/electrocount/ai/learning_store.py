@@ -1,4 +1,5 @@
 """Portable human feedback. Only explicit assessments become training labels."""
+from ..json_values import dumps as json_dumps
 import base64
 import hashlib
 import io
@@ -62,7 +63,7 @@ class LearningStore:
         blob_crop = png_bytes(crop) if not isinstance(crop, bytes) else crop
         decode(blob_ref); decode(blob_crop)
         doc = record['document']
-        identifier = hashlib.sha256(json.dumps([doc, record['page'], record['group_id'],
+        identifier = hashlib.sha256(json_dumps([doc, record['page'], record['group_id'],
             [round(float(v), 3) for v in record['rect']]], sort_keys=True).encode()).hexdigest()
         with self.connect() as db:
             # Search can assign fresh detection UUIDs at the same location.
@@ -77,8 +78,8 @@ class LearningStore:
                        (doc, record.get('document_name', 'Dokument'), record.get('split', split)))
             db.execute('INSERT OR REPLACE INTO examples VALUES(?,?,?,?,?,?,?,?,?,?,?)',
                 (identifier, doc, record['page'], record['group_id'], record['group_name'],
-                 json.dumps(record['rect']), record['outcome'], blob_ref, blob_crop,
-                 json.dumps(record.get('metadata', {})), time.time()))
+                 json_dumps(record['rect']), record['outcome'], blob_ref, blob_crop,
+                 json_dumps(record.get('metadata', {})), time.time()))
         return identifier
 
     def examples(self, with_images=True):
@@ -147,7 +148,7 @@ class LearningStore:
         for row in rows:
             row['reference'] = base64.b64encode(row['reference']).decode()
             row['crop'] = base64.b64encode(row['crop']).decode()
-        payload = json.dumps({'format': 'electrocount-examples-v1', 'examples': rows}, ensure_ascii=False)
+        payload = json_dumps({'format': 'electrocount-examples-v1', 'examples': rows}, ensure_ascii=False)
         with zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED) as archive:
             archive.writestr('examples.json', payload)
 
@@ -196,7 +197,7 @@ class LearningStore:
     def save_report(self, report):
         with self.connect() as db:
             db.execute('INSERT OR REPLACE INTO reports VALUES(?,?,?)',
-                       (report['id'], json.dumps(report), time.time()))
+                       (report['id'], json_dumps(report), time.time()))
 
     def reports(self):
         with self.connect() as db:

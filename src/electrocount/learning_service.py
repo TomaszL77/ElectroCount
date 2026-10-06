@@ -1,4 +1,5 @@
 """Queue explicit feedback and run CPU training without blocking interactions."""
+from .json_values import dumps as json_dumps
 import json
 import logging
 import sys
@@ -59,7 +60,7 @@ class LearningService(QObject):
         if self.process.state() != QProcess.ProcessState.Running:
             return
         self.current = self.queue.popleft()
-        self.process.write((json.dumps(self.current, ensure_ascii=True) + '\n').encode())
+        self.process.write((json_dumps(self.current, ensure_ascii=True) + '\n').encode())
         self.changed.emit()
 
     def read(self):

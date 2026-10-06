@@ -1,3 +1,7 @@
+# 0.7.8.4 — granice JSON i wzorce z rzutu
+
+Podstawa: 0.7.8.3, commit 58734a7567ad1e3355bea524d9dbb0b721209609. Szczegóły: docs/json-0784.md. Pełna analiza kodów pozostaje domyślna; sam kształt jest jawnie wybierany. Prywatne dane i modele użytkownika są osobnymi pakietami.
+
 # 0.7.8.3 — ramki z osobnych wypełnionych konturów i oprawy bez kodów
 
 Podstawa: 0.7.8.2, commit e2dcd475782f85e3134505c28972eed952c51a0b. Nowy tryb kształtu i koloru jest jawnie włączany przez użytkownika; pełne rozróżnienie oznaczeń pozostaje domyślne. Szczegóły: docs/lighting-0783.md. Modele, dane ocen i PDF-y użytkownika pozostają poza repozytorium.

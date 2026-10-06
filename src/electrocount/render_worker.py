@@ -1,4 +1,5 @@
 """Persistent, isolated PDFium viewer process. No OCR/model/detector imports."""
+from .json_values import dumps as json_dumps
 import json
 import math
 import sys
@@ -87,7 +88,7 @@ def main():
                            'seconds': time.monotonic() - started}
             except Exception as exc:
                 message = {'id': request['id'], 'error': str(exc)}
-            print(json.dumps(message, ensure_ascii=True), flush=True)
+            print(json_dumps(message, ensure_ascii=True), flush=True)
     finally:
         renderer.close()
 

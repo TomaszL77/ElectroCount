@@ -1,4 +1,5 @@
 """Short-lived subprocess. A result is published only after a complete operation."""
+from .json_values import dumps as json_dumps
 import json
 import sys
 import time
@@ -16,7 +17,7 @@ from .file_import_manager import FileImportManager
 
 
 def emit(message):
-    print(json.dumps(message,ensure_ascii=True),flush=True)
+    print(json_dumps(message,ensure_ascii=True),flush=True)
 
 
 def execute(request, plan):

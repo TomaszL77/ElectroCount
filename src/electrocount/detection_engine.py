@@ -30,7 +30,8 @@ class DetectionEngine:
             template['source']=previous.get('source',template['source'])
             template['group_id']=previous.get('group_id',previous.get('representation',{}).get('group_id'))
             template['id']=previous.get('id',previous.get('representation',{}).get('id'))
-        shape_color=template.get('match_mode')=='shape_color'
+        shape_color=template.get('match_mode') in ('shape','shape_color')
+        strict_color=template.get('match_mode')=='shape_color'
         expected='' if shape_color else normalize_text(label or template.get("label",""))
         if template.get('signature') and template.get('source')=='LEGEND':
             template['signature']['source_legend']=True
@@ -291,7 +292,7 @@ class DetectionEngine:
             if candidate_color is None or self.encoder:
                 patch=mask_text(self.pdf.render(path,page,2.,crop_box),items,crop_box,2.)
                 if candidate_color is None:candidate_color=color_signature(patch)
-            if shape_color and not color_matches(reference_color,candidate_color):
+            if strict_color and not color_matches(reference_color,candidate_color):
                 result['rejected_candidates'].append({'rect':candidate['rect'],'status':'REJECTED','reason':'different_foreground_color'})
                 continue
             visual=None

@@ -1,4 +1,5 @@
 """A bounded render queue and an independent cancellable analysis process."""
+from .json_values import dumps as json_dumps
 import json
 import logging
 import sys
@@ -47,7 +48,7 @@ class JobManager(QObject):
         request["cache_dir"] = str(Path(self.temp.path())/"pdf-cache")
         request["output"] = str(Path(self.temp.path()) / (token + ".png"))
         filename = Path(self.temp.path()) / (token + ".json")
-        filename.write_text(json.dumps(request), encoding="utf-8")
+        filename.write_text(json_dumps(request), encoding="utf-8")
         process = QProcess(self)
         env = QProcessEnvironment.systemEnvironment()
         env.insert("PYTHONPATH", str(Path(__file__).parent.parent))
