@@ -1,3 +1,7 @@
+# 0.7.8.6 — wygodniejsza praca
+
+Podstawa 0.7.8.5, commit 0a48383f01648cbdf3371e5ad62a61a0d367676f. Zmieniono wyłącznie interfejs i obsługę poleceń. Silniki wyszukiwania, definicja wzorca, zapis projektu, modele i biblioteki nie zmieniły się. Panel grup ma więcej miejsca i pionowy splitter z wykryciami. Próg podobieństwa i filtry są w jednym oknie ustawień, podsumowanie w osobnym ukrytym panelu szczegółów. Delete naprawdę usuwa wykrycie, czyści jego relacje konfliktów i wspiera historię. Usunięta ręczna korekta nie staje się błędnym przykładem treningowym. Q jest chwilowym narzędziem, przy puszczeniu / utracie aktywności wraca poprzedni tryb; wpisywanie tekstu i dialogi nie uruchamiają skrótu. Shift + rolka przesuwa poziomo bez zmiany zoomu. Szczegóły i ograniczenia kontroli: docs/workspace-0786.md.
+
 # 0.7.8.5 — rzeczywisty przebieg z legendy
 
 Podstawa: 0.7.8.4, commit 759a6490c20e5f933ed38bd49893b9a95bc1af7e. Szczegóły: docs/legend-0785.md. Nowy PDF odtworzył ograniczenie do legendy także tutaj: tekst OCR wyłączał wykrywanie tabeli, a nazwa typu była błędnie wymagana na rzucie. Domyślny kształt dotyczy samych symboli w potwierdzonej tabeli; jawne kody i tryby są zachowane. Native CAD wymaga zgodnego widocznego wypełnienia; sprawdzanie wypełnień nie może być obchodzone przez sieć. Nie zmieniono wag modelu. Nie deklarować porównania rzeczywistego środowiska Windows użytkownika bez jego eksportu diagnozy. Prywatne PDF-y i projekt pozostają poza repozytorium.

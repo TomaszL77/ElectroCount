@@ -30,13 +30,14 @@ class TemplatePreview(QWidget):
         if not signature and self.original.isNull():return
         painter=QPainter(self);painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
-        painter.fillRect(QRectF(0,2,88,76),QColor('#c6d1dc'))
+        height = min(76, self.height() - 4)
+        painter.fillRect(QRectF(0,2,88,height),QColor('#c6d1dc'))
         if not self.original.isNull():
-            fitted=self.original.size().scaled(76,64,Qt.KeepAspectRatio)
-            painter.drawImage(QRectF((88-fitted.width())/2,(80-fitted.height())/2,fitted.width(),fitted.height()),self.foreground)
+            fitted=self.original.size().scaled(76,max(1,height-12),Qt.KeepAspectRatio)
+            painter.drawImage(QRectF((88-fitted.width())/2,(height+4-fitted.height())/2,fitted.width(),fitted.height()),self.foreground)
         else:
-            x,y,w,h=signature['bbox'];scale=min(70/max(w,.1),62/max(h,.1))
-            ox,oy=(88-w*scale)/2,(80-h*scale)/2
+            x,y,w,h=signature['bbox'];scale=min(70/max(w,.1),max(1,height-14)/max(h,.1))
+            ox,oy=(88-w*scale)/2,(height+4-h*scale)/2
             painter.save();painter.translate(ox,oy);painter.scale(scale,scale);painter.translate(-x,-y)
             pen=QPen(QColor('#13283b'));pen.setWidthF(1);pen.setCosmetic(True);painter.setPen(pen)
             for item in signature['paths']:
@@ -53,5 +54,5 @@ class TemplatePreview(QWidget):
         painter.setPen(QColor('#b9cede'))
         painter.drawText(QRectF(100,8,max(0,self.width()-102),25),Qt.AlignLeft,'Szukany symbol')
         painter.setPen(QColor('#5ecbc0'))
-        painter.drawText(QRectF(100,32,max(0,self.width()-102),38),Qt.AlignLeft|Qt.TextWordWrap,
+        painter.drawText(QRectF(100,32,max(0,self.width()-102),max(1,height-28)),Qt.AlignLeft|Qt.TextWordWrap,
                          'Oznaczenie: '+(self.label or 'brak'))

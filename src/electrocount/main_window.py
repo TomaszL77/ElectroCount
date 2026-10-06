@@ -2,12 +2,14 @@ import logging
 import os
 from collections import OrderedDict
 from pathlib import Path
-from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtCore import Qt, QSize, QTimer, QEvent
 from PySide6.QtGui import QColor, QIcon, QPixmap, QTransform
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QListWidget, QListWidgetItem, QTreeWidget, QTreeWidgetItem, QSplitter, QToolBar,
     QApplication, QFileDialog, QInputDialog, QMessageBox, QColorDialog, QProgressBar, QDoubleSpinBox,
-    QCheckBox, QPushButton, QTabWidget, QMenu, QListView)
+    QCheckBox, QPushButton, QTabWidget, QMenu, QListView, QDockWidget,
+    QDialog, QDialogButtonBox, QFormLayout, QLineEdit, QTextEdit, QPlainTextEdit,
+    QAbstractSpinBox, QComboBox)
 from .commands import Command, CommandRegistry
 from .domain import Project, Group, Detection, ConflictEngine, counts, near
 from .drawing_view import DrawingView
@@ -74,6 +76,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.conflicts, self.conflict_ids = [], set()
         self.selected, self.generation = "", 0
         self.busy = self.loading = self.refreshing = False
+        self._manual_previous_mode = None
         self.preview_cache = OrderedDict()
         self.thumb_loaded, self.thumb_pending = set(), set()
         self.detail_key = None
@@ -96,6 +99,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.registry = CommandRegistry(self)
         self.register_commands()
         self.build_ui()
+        QApplication.instance().installEventFilter(self)
         self.init_import_ui()
         self.overlay_scale = None
         self.view.viewport_changed.connect(self.refresh_view_overlays)
@@ -272,7 +276,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("find", "Znajdź", "search", self.find_matches, lambda: active() and bool(self.project.active_group().template)),
             Command("socket_catalogue", "Wszystkie typy gniazd", "search", self.find_socket_catalogue,
                     lambda: bool(self.project.pages) and not self.busy and not self.loading and any(g.template for g in self.project.groups)),
-            Command("manual", "Dodaj ręcznie", "manual", lambda: self.set_mode("manual"), active, checked=lambda: hasattr(self, "view") and self.view.mode == "manual"),
+            Command("manual", "Dodaj ręcznie", "manual", lambda: self.set_mode("manual"), active,
+                    description="Przytrzymaj Q, aby tymczasowo dodawać ręcznie", checked=lambda: hasattr(self, "view") and self.view.mode == "manual"),
             Command("undo", "Cofnij", "undo", self.undo, lambda: editable() and bool(self.history.undo_stack), "Ctrl+Z"),
             Command("redo", "Ponów", "redo", self.redo, lambda: editable() and bool(self.history.redo_stack), "Ctrl+Y"),
             Command("previous", "Poprzedni", "previous", lambda: self.navigate(-1), active, "P"),
@@ -283,7 +288,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("only", "Tylko aktywna", "layers", lambda: self.visibility("active"), active),
             Command("accept", "Akceptuj", "check", lambda: self.decide("accepted"), lambda: selected() and bool(self.selected_detection().group)),
             Command("reject", "Odrzuć", "delete", lambda: self.decide("rejected"), selected),
-            Command("delete", "Usuń", "delete", lambda: self.decide("rejected"), selected, "Delete"),
+            Command("delete", "Usuń wykrycie", "delete", self.delete_detection, selected, "Delete"),
             Command("assign", "Przypisz do grupy", "layers", self.reassign, selected),
             Command("escape", "Anuluj narzędzie", "pan", lambda: self.set_mode("pan"), shortcut="Esc"),
             Command("debug", "Detection Debug", "settings", self.toggle_debug, checked=lambda: hasattr(self,"debug_panel") and self.debug_panel.isVisible()),
@@ -311,7 +316,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("learning", "Uczenie AI", "settings", self.show_learning),
             Command("learning_variant", "Oceń: inny wariant", "layers", lambda:self.assess_selected('variant'), selected),
             Command("learning_uncertain", "Oceń: niepewny", "settings", lambda:self.assess_selected('uncertain'), selected),
-            Command("settings", "Próg konfliktu", "settings", self.settings, lambda: not self.busy),
+            Command("details", "Szczegóły grupy i wyników", "settings", self.toggle_result_details),
+            Command("settings", "Ustawienia wyszukiwania i widoku…", "settings", self.settings, lambda: not self.busy and not self.loading),
         ]
         for command in commands:
             self.registry.register(command)
@@ -328,13 +334,13 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.current_page_only.toggled.connect(lambda value: self.settings_store.set("search/current_page_only",value))
         sections = [("Projekt", ["new", "open", "save"]), ("Widok", ["pan", "fit"]),
                     ("Zliczanie", ["group", "template", "replace_template", "find", "socket_catalogue", "manual"]),
-                    ("Edycja", ["undo", "redo"]), ("Uczenie", ["learning", "learning_variant", "learning_uncertain"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "export_diagnostics", "template_legend", "shape_only", "shape_color", "reference_page", "hybrid", "performance"])]
+                    ("Edycja", ["undo", "redo", "delete"]), ("Uczenie", ["learning", "learning_variant", "learning_uncertain"]), ("Ustawienia", ["settings", "details", "debug", "artifacts", "diagnostic_test", "debug_folder", "export_diagnostics", "template_legend", "shape_only", "shape_color", "reference_page", "hybrid", "performance"])]
         for title, keys in sections:
             menu = self.menuBar().addMenu(title)
             if toolbar.actions():
                 toolbar.addSeparator()
             for key in keys:
-                if key not in ("replace_template","debug","artifacts","diagnostic_test","debug_folder","export_diagnostics","template_legend","shape_only","shape_color","reference_page","hybrid","performance"):
+                if key not in ("replace_template","settings","details","delete","debug","artifacts","diagnostic_test","debug_folder","export_diagnostics","template_legend","shape_only","shape_color","reference_page","hybrid","performance"):
                     toolbar.addAction(self.registry.actions[key])
                 if key=="find":
                     toolbar.addWidget(self.current_page_only)
@@ -394,9 +400,16 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         right = QWidget()
         layout = QVBoxLayout(right)
         layout.setContentsMargins(8, 0, 8, 8)
+        self.work_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.work_splitter.setChildrenCollapsible(False)
+        layout.addWidget(self.work_splitter, 1)
+        groups_panel = QWidget()
+        groups_layout = QVBoxLayout(groups_panel)
+        groups_layout.setContentsMargins(0, 0, 0, 0)
+        groups_layout.setSpacing(3)
         label = QLabel("GRUPY ZLICZANIA")
         label.setObjectName("section")
-        layout.addWidget(label)
+        groups_layout.addWidget(label)
         self.groups = QTreeWidget()
         self.groups.setHeaderLabels(["Grupa", "Znaleziono", "OK", "Sprawdź", "Konflikt"])
         self.groups.setRootIsDecorated(False)
@@ -411,34 +424,41 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.groups.itemDoubleClicked.connect(self.edit_group)
         self.groups.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.groups.customContextMenuRequested.connect(self.group_menu)
-        layout.addWidget(self.groups, 2)
+        self.groups.setMinimumHeight(120)
+        groups_layout.addWidget(self.groups, 1)
         visibility = QToolBar()
         for key in ["show", "hide", "only"]:
             visibility.addAction(self.registry.actions[key])
-        layout.addWidget(visibility)
+        visibility.setIconSize(QSize(18, 18))
+        visibility.addAction(self.registry.actions["details"])
+        groups_layout.addWidget(visibility)
+        self.work_splitter.addWidget(groups_panel)
+        results_panel = QWidget()
+        results_layout = QVBoxLayout(results_panel)
+        results_layout.setContentsMargins(0, 0, 0, 0)
+        results_layout.setSpacing(3)
         from .template_preview import TemplatePreview
         self.template_preview=TemplatePreview()
-        layout.addWidget(self.template_preview)
-        row = QHBoxLayout()
-        row.addWidget(QLabel("Próg podobieństwa"))
-        self.threshold = QDoubleSpinBox()
+        self.template_preview.setFixedHeight(64)
+        results_layout.addWidget(self.template_preview)
+        # These controls belong to Settings, keeping the work panel compact.
+        self.threshold = QDoubleSpinBox(self)
         self.threshold.setRange(0.50, 0.99)
         self.threshold.setSingleStep(0.01)
         self.threshold.setValue(self.project.threshold)
         self.threshold.valueChanged.connect(self.threshold_changed)
-        row.addWidget(self.threshold)
-        layout.addLayout(row)
-        self.review_only = QCheckBox("Tylko do weryfikacji i konflikty")
+        self.threshold.hide()
+        self.review_only = QCheckBox("Tylko do weryfikacji i konflikty", self)
         self.review_only.toggled.connect(lambda _: self.refresh_results())
-        layout.addWidget(self.review_only)
-        self.active_group_only = QCheckBox("Na rysunku tylko aktywna grupa")
+        self.review_only.hide()
+        self.active_group_only = QCheckBox("Na rysunku tylko aktywna grupa", self)
         self.active_group_only.setChecked(self.settings_store.get("view/active_group_only",False))
         self.active_group_only.toggled.connect(self.active_group_filter_changed)
-        layout.addWidget(self.active_group_only)
+        self.active_group_only.hide()
         self.found_count = QLabel("Znaleziono: 0")
         self.found_count.setWordWrap(True)
         self.found_count.setStyleSheet("font-size: 18px; font-weight: bold; padding: 6px;")
-        layout.addWidget(self.found_count)
+        results_layout.addWidget(self.found_count)
         self.tabs = QTabWidget()
         self.results, self.conflict_list = QListWidget(), QListWidget()
         self.results.currentItemChanged.connect(self.result_selected)
@@ -446,14 +466,30 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.conflict_list.itemDoubleClicked.connect(self.resolve_conflict)
         self.tabs.addTab(self.results, "Wykrycia")
         self.tabs.addTab(self.conflict_list, "Konflikty")
-        layout.addWidget(self.tabs, 3)
+        self.results.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.results.customContextMenuRequested.connect(self.detection_menu)
+        self.tabs.setMinimumHeight(105)
+        results_layout.addWidget(self.tabs, 1)
+        result_actions = QToolBar()
+        result_actions.setIconSize(QSize(18, 18))
+        result_actions.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        result_actions.addAction(self.registry.actions["delete"])
+        results_layout.addWidget(result_actions)
         self.resolve_button = QPushButton("Rozwiąż wybrany konflikt…")
         self.resolve_button.clicked.connect(self.resolve_conflict)
-        layout.addWidget(self.resolve_button)
+        results_layout.addWidget(self.resolve_button)
+        self.work_splitter.addWidget(results_panel)
+        self.work_splitter.setStretchFactor(0, 3)
+        self.work_splitter.setStretchFactor(1, 2)
+        self.work_splitter.setSizes([420, 280])
         self.summary = QLabel("Brak wyników")
         self.summary.setWordWrap(True)
         self.summary.setStyleSheet("padding: 10px; color: #92adc2;")
-        layout.addWidget(self.summary)
+        self.result_details = QDockWidget("Szczegóły grupy i wyników", self)
+        self.result_details.setWidget(self.summary)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.result_details)
+        self.result_details.hide()
+        self.result_details.visibilityChanged.connect(lambda _: self.registry.refresh())
         self.results_sidebar = CollapsiblePanel("Grupy i wyniki",right,355,490)
         self.results_sidebar.changed.connect(lambda value: self.settings_store.set("results/collapsed",value))
         self.results_sidebar.set_collapsed(self.settings_store.get("results/collapsed"),emit=False)
@@ -493,6 +529,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         if not hasattr(self,'find_spinner'):
             self.find_spinner=QTimer(self);self.find_spinner.setInterval(120);self.find_spinner_frame=0
             self.find_spinner.timeout.connect(self.animate_find)
+        if busy:self.release_manual_hold()
         if busy:self.find_spinner.start()
         else:self.find_spinner.stop()
         self.registry.actions["find"].setText("Analizuję…" if busy else "Znajdź")
@@ -821,7 +858,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
     def set_mode(self, mode):
         self.replacing_group=None
         self.view.set_mode(mode)
-        self.hint.setText({"pan": "Rolka: zoom · przeciągnij: przesuwanie",
+        self.hint.setText({"pan": "Rolka: zoom · Shift + rolka: lewo / prawo · przytrzymaj Q: dodaj ręcznie",
                           "template": "Zaznacz symbol + typ + IP / EX / fazy, jeśli podane · Esc: anuluj",
                           "manual": "Zaznacz prostokątem element do dodania"}[mode])
         self.registry.refresh()
@@ -896,7 +933,8 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             self.project.detections.append(detection)
             self.record_feedback(detection,'correct')
             self.selected = detection.id
-            self.set_mode("pan")
+            if self._manual_previous_mode is None:
+                self.set_mode("pan")
             self.refresh()
 
     def invalidate_label(self, group_id):
@@ -1013,6 +1051,34 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             detection.decision = decision
             self.record_feedback(detection,'correct' if decision=='accepted' else 'wrong')
             self.refresh()
+
+    def delete_detection(self):
+        detection = self.selected_detection()
+        if not detection or self.busy or self.loading:
+            return
+        self.checkpoint()
+        identifier = detection.id
+        self.project.detections = [d for d in self.project.detections if d.id != identifier]
+        self.project.allowed = [pair for pair in self.project.allowed if identifier not in pair]
+        self.project.resolutions = [r for r in self.project.resolutions if identifier not in r.get('participants', [])]
+        # Removing a manual correction is not a negative training example.
+        self.feedback_ids.add(identifier)
+        self.learning.submit({'kind': 'reconcile', 'assessments': {
+            identifier: {'outcome': 'uncertain', 'group_id': ''}}})
+        self.selected = ''
+        self.refresh()
+        self.statusBar().showMessage('Usunięto wykrycie. Ctrl + Z przywraca element.', 8000)
+
+    def detection_menu(self, position):
+        item = self.results.itemAt(position)
+        if not item:
+            return
+        self.results.setCurrentItem(item)
+        self.registry.refresh()
+        menu = QMenu(self)
+        for key in ('accept', 'reject', 'assign', 'delete'):
+            menu.addAction(self.registry.actions[key])
+        menu.exec(self.results.viewport().mapToGlobal(position))
 
     def reassign(self):
         detection = self.selected_detection()
@@ -1135,15 +1201,83 @@ class MainWindow(ImportWindowMixin, QMainWindow):
 
 
     def settings(self):
-        overlap, ok = QInputDialog.getDouble(self, "Próg konfliktu", "IoU (0,05–0,95):",
-                                            self.project.overlap, 0.05, 0.95, 2)
-        if ok:
-            proximity, ok = QInputDialog.getDouble(self, "Odległość środków",
-                "Odległość / mniejszy bok symbolu (0,05–0,95):", self.project.proximity, 0.05, 0.95, 2)
-            if ok:
+        self.release_manual_hold()
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Ustawienia wyszukiwania i widoku')
+        form = QFormLayout(dialog)
+        inputs = []
+        for name, label, value, minimum, maximum in (
+                ('similarity', 'Próg podobieństwa:', self.project.threshold, .50, .99),
+                ('overlap', 'Próg konfliktu (IoU):', self.project.overlap, .05, .95),
+                ('proximity', 'Odległość środków / bok symbolu:', self.project.proximity, .05, .95)):
+            spin = QDoubleSpinBox(dialog)
+            spin.setObjectName(name)
+            spin.setRange(minimum, maximum)
+            spin.setSingleStep(.01)
+            spin.setDecimals(2)
+            spin.setValue(value)
+            form.addRow(label, spin)
+            inputs.append(spin)
+        note = QLabel('Próg podobieństwa dotyczy dopasowania wzorca; nie jest prawdopodobieństwem.\nZmiana progu obowiązuje przy następnym wyszukiwaniu.')
+        note.setWordWrap(True)
+        form.addRow(note)
+        filters = []
+        for original in (self.review_only, self.active_group_only):
+            checkbox = QCheckBox(original.text(), dialog)
+            checkbox.setChecked(original.isChecked())
+            form.addRow(checkbox)
+            filters.append(checkbox)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        form.addRow(buttons)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            values = tuple(spin.value() for spin in inputs)
+            if values != (self.project.threshold, self.project.overlap, self.project.proximity):
                 self.checkpoint()
-                self.project.overlap, self.project.proximity = overlap, proximity
-                self.refresh()
+                self.project.threshold, self.project.overlap, self.project.proximity = values
+                self.threshold.blockSignals(True)
+                self.threshold.setValue(self.project.threshold)
+                self.threshold.blockSignals(False)
+            for original, checkbox in zip((self.review_only, self.active_group_only), filters):
+                original.setChecked(checkbox.isChecked())
+            self.refresh()
+        dialog.deleteLater()
+
+    def toggle_result_details(self):
+        self.result_details.setVisible(not self.result_details.isVisible())
+
+    def release_manual_hold(self):
+        previous = self._manual_previous_mode
+        if previous is not None:
+            self._manual_previous_mode = None
+            self.set_mode(previous[0])
+            self.replacing_group = previous[1]
+            self.hint.setText(previous[2])
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.WindowDeactivate, QEvent.Type.ApplicationDeactivate):
+            if watched is self or event.type() == QEvent.Type.ApplicationDeactivate:
+                self.release_manual_hold()
+        elif event.type() in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease) and event.key() == Qt.Key.Key_Q:
+            if self._manual_previous_mode is not None:
+                if event.type() == QEvent.Type.KeyRelease and not event.isAutoRepeat():
+                    self.release_manual_hold()
+                return True
+            if event.type() == QEvent.Type.KeyPress and not event.isAutoRepeat() and not event.modifiers():
+                focus = QApplication.focusWidget()
+                editing = False
+                while focus is not None:
+                    if isinstance(focus, (QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox)):
+                        editing = True
+                        break
+                    focus = focus.parentWidget()
+                if (not editing and QApplication.activeWindow() is self and
+                        not QApplication.activeModalWidget() and self.registry.commands['manual'].enabled()):
+                    self._manual_previous_mode = (self.view.mode, getattr(self, 'replacing_group', None), self.hint.text())
+                    self.set_mode('manual')
+                    return True
+        return super().eventFilter(watched, event)
 
     def refresh(self):
         self.refreshing = True
@@ -1170,8 +1304,9 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole, ids)
             self.conflict_list.addItem(item)
         self.resolve_button.setEnabled(bool(self.conflicts) and not self.busy)
+        self.resolve_button.setVisible(bool(self.conflicts))
         if self.view.mode == "pan":
-            self.hint.setText("Rolka: zoom · przeciągnij: przesuwanie" if self.project.source else "Otwórz PDF i utwórz pierwszą grupę.")
+            self.hint.setText("Rolka: zoom · Shift + rolka: lewo / prawo · przytrzymaj Q: dodaj ręcznie" if self.project.source else "Otwórz PDF i utwórz pierwszą grupę.")
         self.tabs.setTabText(1, f"Konflikty ({len(self.conflicts)})")
         self.registry.actions["conflicts"].setText(f"Konflikty ({len(self.conflicts)})" if self.conflicts else "Konflikty")
         self.setWindowTitle(f"ElectroCount {__version__} · {self.project.name}" + (" *" if self.dirty else ""))

@@ -1,8 +1,10 @@
 ## 0.7.8.5 — wyszukiwanie wzorca z legendy
 
+0.7.8.6: więcej miejsca na grupy, regulowana wysokość paneli, usuwanie wykryć (również ręcznych), Shift + rolka do przesuwania w poziomie i przytrzymanie Q do szybkiego dodawania. Próg podobieństwa oraz filtry znajdują się w **Ustawienia → Ustawienia wyszukiwania i widoku…**. Rozbudowane informacje przeniesiono do **Ustawienia → Szczegóły grupy i wyników**. [Obsługa 0.7.8.6](docs/workspace-0786.md).
+
 Sam symbol zaznaczony w rozpoznanej tabeli używa kształtu; podpis typu służy jako nazwa grupy. Kod objęty zaznaczeniem nadal podlega pełnej analizie. Ustawienia → Eksportuj diagnozę wyszukiwania pozwala porównać faktyczny model, biblioteki i zaznaczenie. Szczegóły: [docs/legend-0785.md](docs/legend-0785.md).
 
-# ElectroCount 0.7.8.5 — własny mały model AI
+# ElectroCount 0.7.8.6 — własny mały model AI
 
 0.7.8.5: poprawiono błąd zapisu liczb NumPy (`int64`) i obsługę przyciętej ramki arkusza. Dodano jawny tryb **sam kształt** dla wzorców bez kodu, także w szarych kopiach. Szczegóły: [docs/json-0784.md](docs/json-0784.md).
 0.7.8.5: poprawiono odczyt wypełnionych ramek CAD i dodano opcję **Ustawienia → Wzorzec bez oznaczenia: kształt i kolor** dla opraw bez kodów. Szczegóły: [docs/lighting-0783.md](docs/lighting-0783.md).
@@ -12,7 +14,7 @@ Poprawiono odczyt klipów CAD, rozróżnianie pełnych kształtów i oznaczeń g
 
 ## Uruchomienie
 
-Rozpakuj wersję do nowego folderu i uruchom **Uruchom.cmd z tego folderu**. W oknie musi być **0.7.8.5**. Jeśli działa runtime 0.7, nie musisz ponownie pobierać bibliotek ani dużego modelu. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Instalator domyślnie nie pobiera DINO Base; Instaluj_AI.cmd pozostaje opcją dla pełnego, dotychczasowego trybu.
+Rozpakuj wersję do nowego folderu i uruchom **Uruchom.cmd z tego folderu**. W oknie musi być **0.7.8.6**. Jeśli działa runtime 0.7, nie musisz ponownie pobierać bibliotek ani dużego modelu. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Instalator domyślnie nie pobiera DINO Base; Instaluj_AI.cmd pozostaje opcją dla pełnego, dotychczasowego trybu.
 
 ## Nauka podczas pracy
 

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QIcon, QPixmap, QPainter
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import QApplication, QLineEdit, QTextEdit, QAbstractSpinBox
+from PySide6.QtWidgets import QApplication, QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox
 
 
 # Original, consistent 24-unit outline icons. Replace centrally to change the set.
@@ -84,7 +84,7 @@ class CommandRegistry:
     def invoke(self, key):
         command = self.commands[key]
         focus = QApplication.focusWidget()
-        if command.shortcut in ("N", "P", "F", "Delete") and isinstance(focus, (QLineEdit, QTextEdit, QAbstractSpinBox)):
+        if command.shortcut in ("N", "P", "F", "Delete") and isinstance(focus, (QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox)):
             return
         if command.enabled():
             command.execute()
@@ -96,4 +96,3 @@ class CommandRegistry:
             action.setEnabled(bool(command.enabled()))
             if command.checked:
                 action.setChecked(bool(command.checked()))
-

@@ -118,6 +118,18 @@ class DrawingView(QGraphicsView):
         self.schedule_detail()
 
     def wheelEvent(self, event):
+        if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+            pixels = event.pixelDelta()
+            angles = event.angleDelta()
+            delta = (pixels.x() or pixels.y()) if not pixels.isNull() else (angles.x() or angles.y()) / 120 * 80
+            bar = self.horizontalScrollBar()
+            bar.setValue(bar.value() - round(delta))
+            self.schedule_detail()
+            event.accept()
+            return
+        if not event.angleDelta().y():
+            event.accept()
+            return
         factor = 1.18 if event.angleDelta().y() > 0 else 1/1.18
         if 0.03 <= self.transform().m11()*factor <= 12:
             self.scale(factor, factor)
