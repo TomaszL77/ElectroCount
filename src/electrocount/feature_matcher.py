@@ -38,14 +38,22 @@ def contour_evidence(reference,candidate):
     for m in masks:
         contours,hierarchy=cv2.findContours(m,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
         significant=[i for i,c in enumerate(contours) if cv2.contourArea(c)>20]
-        roots=sum(hierarchy[0][i][3]<0 for i in significant) if hierarchy is not None else 0
-        holes=sum(hierarchy[0][i][3]>=0 for i in significant) if hierarchy is not None else 0
+        def depth(index):
+            value=0
+            while hierarchy[0][index][3]>=0:
+                index=hierarchy[0][index][3];value+=1
+            return value
+        levels={i:depth(i) for i in significant} if hierarchy is not None else {}
+        roots=sum(d%2==0 for d in levels.values())
+        holes=sum(d%2==1 for d in levels.values())
         structures.append((roots,holes))
         voids=[]
         for i in significant:
-            if hierarchy[0][i][3]<0:continue
+            if levels.get(i,0)%2==0:continue
             hole=np.zeros_like(m);cv2.drawContours(hole,contours,i,1,-1)
             hole=cv2.erode(hole,np.ones((5,5),np.uint8))
+            # An ink island nested in a hole is expected paint, not empty paper.
+            hole[m>0]=0
             if hole.sum()>=20:voids.append(hole.astype(bool))
         void_masks.append(voids)
     density=min(float(masks[0].sum()),float(masks[1].sum()))/max(float(masks[0].sum()),float(masks[1].sum()))
@@ -85,7 +93,7 @@ def geometric_verification(points0,points1,shape):
 
 
 class OpenCVFeatureMatcher:
-    def verify_with_context(self, reference, candidate, context, padding):
+    def verify_with_context(self, reference, candidate, context, padding, width_fraction=.15):
         """Recover only complete symbols crossed by an externally proven line.
 
         An extra internal line is a device variant. A background line must
@@ -110,7 +118,7 @@ class OpenCVFeatureMatcher:
             result=np.zeros_like(values)
             edges=np.diff(np.r_[False,values,False].astype(int))
             for start,end in zip(np.flatnonzero(edges==1),np.flatnonzero(edges==-1)):
-                if end-start<=max(1,min(h,w)*.15):result[start:end]=True
+                if end-start<=max(1,min(h,w)*width_fraction):result[start:end]=True
             return result
         stripes=np.broadcast_to(thin_runs(vertical),(h,w)) | np.broadcast_to(thin_runs(horizontal)[:,None],(h,w))
         stripes=cv2.dilate(stripes.astype(np.uint8),np.ones((3,3),np.uint8))>0
@@ -152,6 +160,12 @@ class OpenCVFeatureMatcher:
                 "verified":geometric["verified"] and structure_ok,
                 "verification_reason":geometric["verification_reason"] if not geometric["verified"] else reason,
                 "verification_method":"orb_ransac","contour_geometry_score":contour["geometry_score"]}
+
+
+class NativePaintMatcher(OpenCVFeatureMatcher):
+    """Geometry is already exact; verify observed paint without a second ORB gate."""
+    def verify(self, reference, candidate):
+        return contour_evidence(reference,candidate)
 
 
 class LearnedFeatureMatcher:

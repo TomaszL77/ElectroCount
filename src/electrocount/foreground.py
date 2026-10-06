@@ -82,3 +82,19 @@ def shape_evidence(reference, candidate):
                 and evidence.get('reference_coverage',0)>=.85 and evidence.get('fill_consistent',False)):
             accepted.append(evidence)
     return max(accepted,key=lambda e:e['geometry_score']) if accepted else None
+
+
+def learned_pair_compatible(reference, candidate):
+    """A pair score may recover an ORB failure, never a visibly different body."""
+    from .feature_matcher import contour_evidence
+    a,b=foreground_crop(reference),foreground_crop(candidate)
+    if min(a.shape[:2]+b.shape[:2])<2:return False
+    if not ink_mask(a).any() or not ink_mask(b).any():return False
+    ar,br=a.shape[1]/a.shape[0],b.shape[1]/b.shape[0]
+    if max(ar,br)/min(ar,br)>1.2:return False
+    evidence=contour_evidence(a,b)
+    return (evidence.get('geometry_score',0)>=.70
+        and evidence.get('feature_score',0)>=.60
+        and evidence.get('foreground_ratio',0)>=.60
+        and evidence.get('reference_coverage',0)>=.70
+        and evidence.get('fill_consistent',False))

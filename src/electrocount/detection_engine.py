@@ -22,12 +22,18 @@ class DetectionEngine:
     def find(self,path,page,template,label="",threshold=.82,progress=lambda p:None,template_path=None,status=lambda text:None):
         status("Odczyt tekstu i przygotowanie wzorca")
         source=template_path or path
-        if not template.get("text_aware") or (template.get("definition_version",0)<11 and
+        if not template.get("text_aware") or (template.get("definition_version",0)<12 and
                 template.get("selection_rect") and hasattr(self.pdf,"open_vector_page")):
             previous=template
             from .detection_service import prepare_detection
             template=prepare_detection(self.pdf,source,template['page'],template.get('selection_bbox',template.get('selection_rect',template['rect'])))
-            template['source']=previous.get('source',template['source'])
+            if previous.get('source_override'):
+                template['source']=previous['source_override']
+            elif previous.get('source')=='LEGEND':
+                template['source']='LEGEND'
+            if 'match_mode' in previous:template['match_mode']=previous['match_mode']
+            if template.get('signature'):
+                template['signature']['source_legend']=template.get('source')=='LEGEND'
             template['group_id']=previous.get('group_id',previous.get('representation',{}).get('group_id'))
             template['id']=previous.get('id',previous.get('representation',{}).get('id'))
         shape_color=template.get('match_mode') in ('shape','shape_color')
@@ -132,7 +138,51 @@ class DetectionEngine:
         shape_recovered=0
         reference_cache={}
         verified=[];rejected=[]
+        visible_cache={}
         for index,candidate in enumerate(proposals):
+            if candidate.get('verified') and candidate.get('source','').startswith('native_'):
+                from .symbol_sampling import verification_images
+                from .feature_matcher import contour_evidence
+                from .foreground import foreground_crop
+                pose={**candidate,'raster_angle':-candidate.get('rotation',0)}
+                key=(tuple(round(v,3) for v in candidate['rect']),candidate.get('rotation',0))
+                if key not in visible_cache:
+                    # Geometry bounds omit half the stroke. Include the observed
+                    # stroke margin available inside the authoritative selection.
+                    import numpy as np
+                    sx,sy,sw,sh=template.get('selection_bbox',template['rect'])
+                    rx,ry,rw,rh=template['rect']
+                    left,top=max(sx,rx-.75),max(sy,ry-.75)
+                    right,bottom=min(sx+sw,rx+rw+.75),min(sy+sh,ry+rh+.75)
+                    ref_box=[left,top,right-left,bottom-top]
+                    matrix=np.asarray(candidate['transform']).reshape(2,3)
+                    corners=np.array([[left,top],[right,top],[left,bottom],[right,bottom]])@matrix[:,:2].T+matrix[:,2]
+                    from .vector_engine import bbox
+                    pose['verification_rect']=bbox(corners)
+                    paint_template={**template,'raster_rect':ref_box}
+                    transformed,patch,sampling,_=verification_images(
+                        self.pdf,source,path,page,paint_template,pose,template_items,items,reference_cache)
+                    from .feature_matcher import gray
+                    visible_cache[key]=contour_evidence(foreground_crop(gray(transformed)),foreground_crop(gray(patch)))
+                paint=visible_cache[key]
+                candidate['visible_paint']={k:paint.get(k) for k in
+                    ('contours_reference','contours_candidate','fill_consistent','reference_coverage')}
+                if not paint.get('fill_consistent',True):
+                    candidate.update(verified=False,verification_reason='visible_fill_variant_mismatch')
+                elif paint.get('contours_reference')!=paint.get('contours_candidate'):
+                    # A line crossing a device must continue through both
+                    # outside margins; an internal variant cannot use this.
+                    cx,cy,cw,ch=pose['verification_rect']
+                    margin=4.;meta=self.pdf.inspect(path)[page]
+                    confirmed=False
+                    if cx>=margin and cy>=margin and cx+cw+margin<=meta['width'] and cy+ch+margin<=meta['height']:
+                        context_box=[cx-margin,cy-margin,cw+2*margin,ch+2*margin]
+                        outer=mask_text(self.pdf.render(path,page,sampling,context_box),items,context_box,sampling)
+                        aligned=cv2.resize(transformed,(patch.shape[1],patch.shape[0]))
+                        from .feature_matcher import NativePaintMatcher
+                        evidence=NativePaintMatcher().verify_with_context(aligned,patch,outer,round(margin*sampling),width_fraction=.25)
+                        confirmed=evidence.get('verification_reason')=='complete_symbol_with_external_crossing' and evidence.get('verified')
+                    candidate['visible_paint_review']=not confirmed
             if "verified" not in candidate:
                 from .symbol_sampling import verification_images
                 transformed,patch,sampling,reference = verification_images(
@@ -160,25 +210,35 @@ class DetectionEngine:
                 candidate["graphic_score"]=(candidate["score"]+evidence["feature_score"])/2
                 if candidate.get('source')=='label_geometry_probe' and evidence['verified']:
                     candidate['graphic_score']=(evidence['geometry_score']+evidence['feature_score'])/2
-            if not candidate['verified'] and not self.custom_matcher:
+            if not candidate['verified'] and not self.custom_matcher and candidate.get('verification_reason')!='visible_fill_variant_mismatch':
                 if reference is None:
                     reference=mask_text(self.pdf.render(source,template['page'],2.,template.get('raster_rect',template['rect'])),template_items,template.get('raster_rect',template['rect']),2.)
                 partial=verify_partial(self.pdf,path,page,template,reference,candidate,items)
                 if partial:candidate.update(partial)
-            if self.learned_model and (not candidate['verified'] or candidate.get('source') in ('raster','coarse_page')):
+            if self.learned_model and candidate.get('verification_reason')!='visible_fill_variant_mismatch' and (not candidate['verified'] or candidate.get('source') in ('raster','coarse_page')):
                 # Small model can recover proposals rejected by image geometry,
                 # but these are always review items, never automatic quantities.
                 from .ai.learning_images import symbol_crop
-                if learned_reference is None:
-                    ref_box=template.get('raster_rect',template['rect'])
-                    learned_reference=symbol_crop(self.pdf,source,template['page'],ref_box,template_items)
-                patch=symbol_crop(self.pdf,path,page,candidate['rect'],items)
-                probability=self.learned_model.score(learned_reference,patch)
-                candidate['learned_score']=probability
-                if not candidate['verified'] and probability>=self.learned_model.metadata.get('threshold',.9):
-                    candidate.update(verified=True,learned_recovery=True,
-                                     verification_method='learned_pair_review')
-                    learned_recovered+=1
+                from .symbol_sampling import verification_images
+                compatible=True
+                if not candidate['verified']:
+                    from .foreground import learned_pair_compatible
+                    transformed,comparison_patch,_,_ = verification_images(
+                        self.pdf,source,path,page,template,candidate,template_items,items,reference_cache)
+                    compatible=learned_pair_compatible(transformed,comparison_patch)
+                if compatible:
+                    if learned_reference is None:
+                        ref_box=template.get('raster_rect',template['rect'])
+                        learned_reference=symbol_crop(self.pdf,source,template['page'],ref_box,template_items)
+                    patch=symbol_crop(self.pdf,path,page,candidate['rect'],items)
+                    probability=self.learned_model.score(learned_reference,patch)
+                    candidate['learned_score']=probability
+                    if not candidate['verified'] and probability>=self.learned_model.metadata.get('threshold',.9):
+                        candidate.update(verified=True,learned_recovery=True,
+                                         verification_method='learned_pair_review')
+                        learned_recovered+=1
+                else:
+                    candidate['learned_skip_reason']='different_visual_structure'
             if candidate["verified"]:
                 verified.append(candidate)
             else:
@@ -328,6 +388,10 @@ class DetectionEngine:
                 state,decision_reason='REVIEW','uncertain_ocr_label'
             if candidate.get('partial_occlusion') and state!='OTHER_VARIANT':
                 state,decision_reason='REVIEW','partial_occlusion_review'
+            if candidate.get('visible_paint_review') and state!='OTHER_VARIANT':
+                state,decision_reason='REVIEW','visible_paint_needs_review'
+            if candidate.get('visible_paint'):
+                hit['verification_details']['visible_paint']=candidate['visible_paint']
             if candidate.get('learned_recovery') and state!='OTHER_VARIANT':
                 state,decision_reason='REVIEW','learned_pair_review'
             if candidate.get('shape_recovery'):

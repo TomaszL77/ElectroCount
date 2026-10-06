@@ -3,7 +3,7 @@ from .vector_engine import contains
 
 
 def legend_regions(native, items):
-    regions=table_regions(native) if not items else []
+    regions=list(table_regions(native))
     for item in items:
         if item.normalized_text not in ("LEGENDA", "LEGEND"):continue
         options=[]
@@ -61,7 +61,7 @@ def table_regions(native):
         if not 5<median<80 or np.mean(abs(gaps-median)<max(.5,median*.08))<.7:continue
         top,bottom=ys[0],ys[-1]
         if (right-left)*(bottom-top)>native.size[0]*native.size[1]*.15:continue
-        vertical=np.flatnonzero((b[:,0]>=left-3)&(b[:,0]<=right+3)&(b[:,2]<5)&(b[:,3]>median*3)&(native.index[:,5]<=5))
+        vertical=np.flatnonzero((b[:,0]>=left-3)&(b[:,0]<=right+3)&(b[:,2]<5)&(b[:,3]>max(3,median*.8))&(native.index[:,5]<=5))
         columns=defaultdict(list)
         for p in native.decode(vertical) or []:
             x,y,w,h=p['bbox']

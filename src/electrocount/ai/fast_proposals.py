@@ -24,6 +24,8 @@ def propose(pdf, path, page, template, source, items, reference_items, threshold
         return [], ['Wzorzec jest mało czytelny w podglądzie; podstawą pozostaje geometria i lokalna analiza.']
     found = []
     symbol=graphic_box(ref,box,scale)
+    if min(symbol[2:])*scale<5:
+        return [], ['Drobne detale symbolu: skan podglądu nie rozróżnia ich wiarygodnie; użyto dokładnej geometrii i lokalnej analizy.']
     warning = []
     for size in (.85, 1., 1.15):
         for angle in (0, 90, 180, 270):

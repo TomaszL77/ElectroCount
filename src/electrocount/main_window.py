@@ -131,12 +131,26 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         folder=data_dir();folder.mkdir(parents=True,exist_ok=True)
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
+    def export_search_diagnostics(self):
+        filename,_=QFileDialog.getSaveFileName(self,'Eksportuj diagnozę wyszukiwania',
+            'ElectroCount-diagnoza.zip','Pakiet diagnozy (*.zip)')
+        if not filename:return
+        if not filename.lower().endswith('.zip'):filename+='.zip'
+        from .search_diagnostics import export_comparison
+        try:
+            export_comparison(filename,self.project,self.startup_runtime)
+        except (OSError,ValueError) as exc:
+            self.failure(str(exc));return
+        self.statusBar().showMessage('Zapisano diagnozę wyszukiwania: '+filename,20000)
+
     def run_self_test(self):
         directory=new_debug_run()
         def ready(report):
             self.last_self_test=report
             self.statusBar().showMessage(f"Test diagnostyczny: {report['status']} · {report['actual']} / {report['expected']} · {directory}",60000)
-        self.jobs.submit({"kind":"self_test","debug_dir":str(directory)},ready,analysis=True)
+        self.jobs.submit({"kind":"self_test","debug_dir":str(directory),
+            "config":{"engine_mode":self.engine_mode(),
+                "learned_model":self.settings_store.text('learning/active_model','') if self.engine_mode()=='learned' else ''}},ready,analysis=True)
 
     def toggle_template_legend(self):
         group=self.project.active_group()
@@ -144,6 +158,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.checkpoint()
         legend=group.template.get('source')!='LEGEND'
         group.template['source']='LEGEND' if legend else 'DRAWING'
+        group.template['source_override']=group.template['source']
         if group.template.get('signature'):group.template['signature']['source_legend']=legend
         if group.template.get('representation'):group.template['representation']['source']=group.template['source']
         self.statusBar().showMessage('Zmieniono źródło wzorca. Naciśnij Znajdź, aby przeliczyć wyniki.',12000)
@@ -277,6 +292,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
             Command("diagnostic_test", "Uruchom test diagnostyczny", "check", self.run_self_test,
                 lambda:not self.busy and not self.loading),
             Command("debug_folder", "Otwórz logi i wycinki", "open", self.open_debug_folder),
+            Command("export_diagnostics", "Eksportuj diagnozę wyszukiwania…", "save", self.export_search_diagnostics, lambda:not self.busy),
             Command("template_legend", "Wzorzec pochodzi z legendy", "template", self.toggle_template_legend,
                 lambda:active() and bool(self.project.active_group().template),
                 checked=lambda:bool(self.project.active_group() and self.project.active_group().template and self.project.active_group().template.get('source')=='LEGEND')),
@@ -312,13 +328,13 @@ class MainWindow(ImportWindowMixin, QMainWindow):
         self.current_page_only.toggled.connect(lambda value: self.settings_store.set("search/current_page_only",value))
         sections = [("Projekt", ["new", "open", "save"]), ("Widok", ["pan", "fit"]),
                     ("Zliczanie", ["group", "template", "replace_template", "find", "socket_catalogue", "manual"]),
-                    ("Edycja", ["undo", "redo"]), ("Uczenie", ["learning", "learning_variant", "learning_uncertain"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "template_legend", "shape_only", "shape_color", "reference_page", "hybrid", "performance"])]
+                    ("Edycja", ["undo", "redo"]), ("Uczenie", ["learning", "learning_variant", "learning_uncertain"]), ("Ustawienia", ["settings", "debug", "artifacts", "diagnostic_test", "debug_folder", "export_diagnostics", "template_legend", "shape_only", "shape_color", "reference_page", "hybrid", "performance"])]
         for title, keys in sections:
             menu = self.menuBar().addMenu(title)
             if toolbar.actions():
                 toolbar.addSeparator()
             for key in keys:
-                if key not in ("replace_template","debug","artifacts","diagnostic_test","debug_folder","template_legend","shape_only","shape_color","reference_page","hybrid","performance"):
+                if key not in ("replace_template","debug","artifacts","diagnostic_test","debug_folder","export_diagnostics","template_legend","shape_only","shape_color","reference_page","hybrid","performance"):
                     toolbar.addAction(self.registry.actions[key])
                 if key=="find":
                     toolbar.addWidget(self.current_page_only)
@@ -861,6 +877,7 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 info = f"Wykryte oznaczenie: {detected}" if detected else f"Utworzono {name}"
                 if target.possible_label:
                     info += f" · Możliwe oznaczenie: {target.possible_label}"
+                if template.get('label_role')=='legend_caption' and template.get('match_mode')=='shape':info+=' · Wyszukiwanie kształtu z legendy'
                 if replacing:info='Zastąpiono wzorzec. Kliknij Znajdź, aby ponownie zweryfikować wyniki.'
                 if template.get("preparation_warnings"):
                     info += " · " + " · ".join(template["preparation_warnings"])

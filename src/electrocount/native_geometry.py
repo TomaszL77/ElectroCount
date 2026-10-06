@@ -328,8 +328,11 @@ class NativeVectorPage:
             path=paths[0]
             if painted_fill(anchor)!=painted_fill(path):continue
             if reference.get('core_fill') and not path.get('fill'):continue
-            if len(path['segments'])!=len(anchor['segments']):continue
-            if sorted(e['kind'] for e in path['segments'])!=sorted(e['kind'] for e in anchor['segments']):continue
+            from .vector_engine import circle_geometry
+            circular_pair=circle_geometry(anchor) is not None and circle_geometry(path) is not None
+            if not circular_pair:
+                if len(path['segments'])!=len(anchor['segments']):continue
+                if sorted(e['kind'] for e in path['segments'])!=sorted(e['kind'] for e in anchor['segments']):continue
             for rotation,translation,scale,angle in native_transforms(anchor,path,(.35,3.0) if reference.get('source_legend') or int(i) in legend_ids else (.80,1.25)):
                 box=bbox(reference_points@rotation.T+translation)
                 if not contains([0,0,*self.size],box,.01):continue
@@ -374,7 +377,7 @@ class NativeVectorPage:
                 else:rejected+=1
             if k%25==0:progress(round(100*k/max(1,len(ids))))
         progress(100)
-        return hits,{'indexed_paths':len(self.index),'decoded_paths':self.decoded,
+        return hits,{'anchor_candidates':len(ids),'verified_poses':len(hits),'indexed_paths':len(self.index),'decoded_paths':self.decoded,
                      'text_seeded_paths':len(seeded),'geometry_rejected':rejected,'index_bytes':self.index.nbytes,
                      'truncated':self.truncated,'has_images':self.has_images,'image_regions':self.image_regions,'index_cache_hit':self.index_cache_hit,
                      'limited_queries':self.limited_queries,'clipped_paths':len(self.clipped),

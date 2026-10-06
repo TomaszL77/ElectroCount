@@ -118,13 +118,15 @@ def prepare_template(engine, path, page, selection):
     if min(selection[2:]) < 3 or max(selection[2:]) > 300:
         raise ValueError("Zaznacz pojedynczy symbol z oznaczeniem (maksymalnie 300 punktów na bok).")
     signature = None
+    legend_region = None
     if hasattr(engine,"open_vector_page"):
         try:
             with engine.open_vector_page(path,page) as native:
                 signature=native.template_signature(selection,items)
                 if signature:
                     from .document_regions import legend_regions, region_for
-                    if region_for(signature['bbox'],legend_regions(native,items)):
+                    legend_region=region_for(signature['bbox'],legend_regions(native,items))
+                    if legend_region:
                         signature['source_legend']=True
         except (RuntimeError,AttributeError) as exc:
             import logging
@@ -156,7 +158,15 @@ def prepare_template(engine, path, page, selection):
     item = association["item"]
     raster_rect=list(selection)
     from .electrical_profile import build_profile
-    return {"source": "LEGEND" if signature and signature.get('source_legend') else "DRAWING",
+    caption_bbox=None
+    if legend_region and legend_region.get('columns') and legend_region.get('rows'):
+        columns=legend_region['columns'];rows=legend_region['rows']
+        cy=rect[1]+rect[3]/2
+        if rect[0]+rect[2]<=columns[1]+.5:
+            row=next(((a,b) for a,b in zip(rows,rows[1:]) if a<=cy<=b),None)
+            if row and len(columns)>=3:
+                caption_bbox=[columns[1]+1,row[0]+1,columns[2]-columns[1]-2,row[1]-row[0]-2]
+    return {"legend_caption_bbox":caption_bbox,"source": "LEGEND" if signature and signature.get('source_legend') else "DRAWING",
             "electrical_profile":build_profile(rect,selected),
             "associated_texts":association.get('associated_texts',[]),
             "text_role_confidence":association.get('text_role_confidence',0),
@@ -167,7 +177,7 @@ def prepare_template(engine, path, page, selection):
             "label_item": item.to_dict() if item else None,
             "spatial_association_score": association["score"],
             "reason": association["reason"], "text_aware": True,
-            "definition_version": 11, "geometry_source": "native_local" if signature else "raster",
+            "definition_version": 12, "geometry_source": "native_local" if signature else "raster",
             "text_bbox":item.bbox if item else None,
             "self_check":False, "extraction_mode":"full_selection",
             "preserved_paths":len(signature["paths"]) if signature else None,"removed_paths":0,

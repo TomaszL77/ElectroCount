@@ -19,7 +19,7 @@ def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_c
         if not outlined_socket and not template.get('label') and (ocr_enabled or not pdf.extract_text(path,page)):
             from .ocr_engine import OCREngine,TextOverridePDF
             native=pdf.extract_text(path,page)
-            recognized=OCREngine().read_region(pdf,path,page,template['rect'],native)
+            recognized=OCREngine().read_region(pdf,path,page,template['rect'],native,context_rect=template.get('legend_caption_bbox'))
             if recognized:
                 pdf=TextOverridePDF(pdf,path,page,native+recognized)
                 template=prepare_template(pdf,path,page,selection)
@@ -33,6 +33,15 @@ def prepare_detection(pdf, path, page, selection, *, debug_dir=None, selection_c
                     'selection':selection,'coordinates':selection_context or {},'file_sha256':digest(path)})
             except Exception:logging.exception('Failed template debug export')
         raise
+    # A caption in the next legend column names a type; it is not a device
+    # inscription on the floor plan. The user's selected pixels remain intact.
+    if template.get('source') == 'LEGEND':
+        from .text_engine import intersection
+        item = template.get('label_item')
+        selection = template['selection_bbox']
+        if not item or intersection(selection, item['bbox']) == 0:
+            template['match_mode'] = 'shape'
+            template['label_role'] = 'legend_caption'
     from .template_representation import build_representation
     template['representation'] = build_representation(pdf,path,page,template)
     if debug_dir:
@@ -107,6 +116,22 @@ def run_detection(pdf, path, page, template, label='', threshold=.82, progress=l
         report['runtime']['model']=result['pipeline'].get('model')
         result['result_sha256'] = result_signature(result)
         result['pipeline']['execution'] = config
+        active_model={'requested':config.get('learned_model') or None,'loaded':learned is not None}
+        if learned is not None:
+            active_model.update(sha256=digest(config['learned_model']),
+                id=learned.metadata.get('id'),input_schema=learned.metadata.get('schema'),
+                threshold=learned.metadata.get('threshold'))
+        rt=report['runtime']
+        result['diagnostics']={'runtime':{k:rt.get(k) for k in
+            ('python','executable','prefix','os','packages','pdfium','qt','renderer','opencv_threads','opencv_opencl')},
+            'code':{k:rt['code'].get(k) for k in ('version','source_root','source_sha256')},
+            'file_sha256':report['file_sha256'],'template_file_sha256':report['template_file_sha256'],
+            'page':page,'selection_bbox':template.get('selection_bbox'),
+            'match_mode':result['template'].get('match_mode','full'),'template_source':result['template'].get('source'),
+            'label_role':result['template'].get('label_role'),'requested_label':label,
+            'expected_device_label':result.get('label'),'engine_mode':config.get('engine_mode','classic'),
+            'model':active_model,'threshold':threshold,'result_sha256':result['result_sha256']}
+
         report.update(status='complete', result_sha256=result['result_sha256'],
             template=result['template'], template_bbox=result['template']['rect'],
             candidate_count=result['stages']['generated'],
@@ -125,6 +150,8 @@ def run_detection(pdf, path, page, template, label='', threshold=.82, progress=l
         report.update(status='error',error=str(exc))
         raise
     finally:
+        if debug_dir:
+            write_json(Path(debug_dir)/'detection_log.json',report)
         render_session.close()
 
 

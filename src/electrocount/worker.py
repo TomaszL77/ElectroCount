@@ -42,7 +42,7 @@ def execute(request, plan):
         write_json(data_dir()/"logs"/"worker_runtime.json",report)
         return report
     if kind=="self_test":
-        return self_test(engine,request["debug_dir"],config=plan.to_dict(),
+        return self_test(engine,request["debug_dir"],config={**plan.to_dict(),**request.get('config',{})},
             progress=lambda p:emit({"progress":p}),status=lambda s:emit({"status":s}))
     if kind=="batch_match":
         results = []
@@ -85,7 +85,7 @@ def execute(request, plan):
         return {'pages':results,'cache_hits':engine.hits}
     if kind=="match":
         result = run_detection(engine,request["path"],request["page"],request["template"],
-            request.get("label",""),request["threshold"],lambda v:emit({"progress":v}),request.get("template_path"),status=lambda stage:emit({"status":stage}),config=plan.to_dict(),debug_dir=request.get('debug_dir'))
+            request.get("label",""),request["threshold"],lambda v:emit({"progress":v}),request.get("template_path"),status=lambda stage:emit({"status":stage}),config={**plan.to_dict(),**request.get('config',{})},debug_dir=request.get('debug_dir'))
         result["pipeline"]["execution"] = plan.to_dict()
         return result
     raise ValueError("Nieznany rodzaj operacji")

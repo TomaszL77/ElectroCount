@@ -187,6 +187,72 @@ def without_redundant_outlines(paths):
     return kept
 
 
+
+def circle_geometry(path):
+    """Recognize a complete circular stroke, independent of Bezier partition."""
+    es=path['segments'];x,y,w,h=path['bbox']
+    if not 3 <= len(es) <= 16 or min(w,h) <= .05 or min(w,h)/max(w,h) < .94:
+        return None
+    if any(e['kind'] != 'curve' for e in es):
+        return None
+    if any(math.dist(a['points'][-1],b['points'][0]) > .001
+           for a,b in zip(es,es[1:]+es[:1])):
+        return None
+    center=np.array([x+w/2,y+h/2]);radius=(w+h)/4
+    samples=np.concatenate([sample_segment(e) for e in es])
+    if np.max(np.abs(np.linalg.norm(samples-center,axis=1)-radius)) > max(.025,radius*.035):
+        return None
+    return center,radius
+
+
+def equivalent_paths(paths):
+    """Normalize PDF paint subdivisions only for comparison, not extraction.
+
+    CAD cap disks attached to endpoints are stroke paint, not sensor features.
+    Join collinear strokes only at a shared endpoint; never bridge a gap.
+    All filled areas, branches and non-collinear device features are retained.
+    """
+    paths=without_redundant_outlines(without_paint_caps(paths))
+    normalized=[];lines=[]
+    for p in paths:
+        circle=circle_geometry(p)
+        if circle:
+            center,r=circle;k=.5522847498307936
+            es=[]
+            for angle in (0,math.pi/2,math.pi,math.pi*1.5):
+                a=np.array([math.cos(angle),math.sin(angle)])
+                b=np.array([-a[1],a[0]])
+                es.append({'kind':'curve','points':[list(center+r*a),list(center+r*(a+k*b)),
+                    list(center+r*(b+k*a)),list(center+r*b)]})
+            normalized.append({**p,'segments':es,'bbox':[*(center-r).tolist(),2*r,2*r]})
+        elif not p.get('fill'):
+            for e in p['segments']:
+                if e['kind']=='line':
+                    lines.append(({**p,'segments':[e],'bbox':bbox(e['points'])},p.get('color'),p.get('stroke_width')))
+                else:
+                    normalized.append({**p,'segments':[e],'bbox':bbox(e['points'])})
+        else:
+            normalized.append(p)
+    changed=True
+    while changed:
+        changed=False
+        for i,(a,color,width) in enumerate(lines):
+            if changed:break
+            u,v=a['segments'][0]['points']
+            for j in range(i+1,len(lines)):
+                b,c,z=lines[j]
+                if color!=c or width!=z:continue
+                q,t=b['segments'][0]['points']
+                pair=next(((left,right,tip) for left,right in ((u,v),(v,u))
+                    for start,tip in ((q,t),(t,q)) if math.dist(right,start)<=.001),None)
+                if not pair:continue
+                left,right,tip=map(np.asarray,pair);d=right-left;e=tip-right;length=np.linalg.norm(d)
+                if length<=.001 or d@e<=0 or abs(d[0]*e[1]-d[1]*e[0])/length>.001:continue
+                edge={'kind':'line','points':[left.tolist(),tip.tolist()]}
+                lines[i]=({**a,'segments':[edge],'bbox':bbox(edge['points'])},color,width)
+                lines.pop(j);changed=True;break
+    return normalized+[p for p,_,_ in lines]
+
 def signature(paths, *, preserve_selection=False):
     paths=[canonical_path(p) for p in paths]
     if not preserve_selection:
@@ -264,6 +330,31 @@ class VectorCandidateGenerator:
         return kept
 
     def verify(self,reference,nearby,rotation,translation,box):
+        exact=self._verify_exact(reference,nearby,rotation,translation,box)
+        if exact['verified'] or not nearby or exact.get('verification_reason')=='fill_variant_mismatch':return exact
+        actual_box=bbox([point for p in nearby for e in p['segments'] for point in e['points']])
+        expected_extents=[box[0],box[1],box[0]+box[2],box[1]+box[3]]
+        actual_extents=[actual_box[0],actual_box[1],actual_box[0]+actual_box[2],actual_box[1]+actual_box[3]]
+        if max(abs(a-b) for a,b in zip(actual_extents,expected_extents))>max(.3,max(box[2:])*.02):
+            return exact
+        # Bound the equivalent-paint route; detailed labels keep the exact gate.
+        if (len(reference['paths'])>64 or len(nearby)>64 or
+            sum(len(p['segments']) for p in reference['paths'])>128 or
+            sum(len(p['segments']) for p in nearby)>128):
+            return exact
+        key=id(reference['paths'])
+        if getattr(self,'_comparison_key',None)!=key:
+            self._comparison_key=key
+            self._comparison_paths=equivalent_paths([canonical_path(p) for p in reference['paths']])
+        normalized={**reference,'paths':self._comparison_paths,'preserve_selection':True}
+        alternate=self._verify_exact(normalized,equivalent_paths([canonical_path(p) for p in nearby]),
+            rotation,translation,box)
+        if alternate['verified']:
+            alternate['verification_method']='native_equivalent_paint'
+            return alternate
+        return exact
+
+    def _verify_exact(self,reference,nearby,rotation,translation,box):
         from collections import Counter
         nearby=[canonical_path(p) for p in nearby]
         if not reference.get('preserve_selection'):

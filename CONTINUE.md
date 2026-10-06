@@ -1,3 +1,7 @@
+# 0.7.8.5 — rzeczywisty przebieg z legendy
+
+Podstawa: 0.7.8.4, commit 759a6490c20e5f933ed38bd49893b9a95bc1af7e. Szczegóły: docs/legend-0785.md. Nowy PDF odtworzył ograniczenie do legendy także tutaj: tekst OCR wyłączał wykrywanie tabeli, a nazwa typu była błędnie wymagana na rzucie. Domyślny kształt dotyczy samych symboli w potwierdzonej tabeli; jawne kody i tryby są zachowane. Native CAD wymaga zgodnego widocznego wypełnienia; sprawdzanie wypełnień nie może być obchodzone przez sieć. Nie zmieniono wag modelu. Nie deklarować porównania rzeczywistego środowiska Windows użytkownika bez jego eksportu diagnozy. Prywatne PDF-y i projekt pozostają poza repozytorium.
+
 # 0.7.8.4 — granice JSON i wzorce z rzutu
 
 Podstawa: 0.7.8.3, commit 58734a7567ad1e3355bea524d9dbb0b721209609. Szczegóły: docs/json-0784.md. Pełna analiza kodów pozostaje domyślna; sam kształt jest jawnie wybierany. Prywatne dane i modele użytkownika są osobnymi pakietami.

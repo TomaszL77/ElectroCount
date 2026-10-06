@@ -12,16 +12,18 @@ class OCREngine:
             det_use_cuda=False,cls_use_cuda=False,rec_use_cuda=False,
             det_use_dml=False,cls_use_dml=False,rec_use_dml=False)
 
-    def read_region(self,pdf,path,page,rect,native_items=()):
+    def read_region(self,pdf,path,page,rect,native_items=(),context_rect=None):
         # Never OCR a region that already has a native associated device code.
         native=TextEngine().associate(rect,native_items)
         if native['item'] is not None or any(a['role']=='DEVICE_LABEL' and a['spatial_score']>=.6 for a in native.get('associated_texts',[])):return []
-        key=(str(path),page,*[round(v,1) for v in rect])
+        key=(str(path),page,*[round(v,1) for v in rect],tuple(context_rect or ()))
         if key in self.cache:return self.cache[key]
         meta=pdf.inspect(path)[page];x,y,w,h=rect
         radius=max(24,max(w,h)*1.5)
         left,top=max(0,x-radius),max(0,y-radius)
         box=[left,top,min(meta['width'],x+w+radius)-left,min(meta['height'],y+h+radius)-top]
+        if context_rect is not None:
+            box=list(context_rect);left,top=box[:2]
         scale=min(12.,max(3.,40/max(min(w,h),1.)))
         image=pdf.render(path,page,scale,box)
         output,_=self.backend(cv2.cvtColor(image,cv2.COLOR_RGB2BGR))
