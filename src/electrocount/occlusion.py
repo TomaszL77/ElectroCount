@@ -11,14 +11,15 @@ from .matcher import template_variant
 
 def label_proposals(template, expected, items, meta):
     layout=template.get('association')
-    if not expected or not layout or not layout.get('offset') or template.get('source')=='LEGEND':return []
+    if not expected or not layout or not layout.get('offset'):return []
+    if template.get('source')=='LEGEND' and not template.get('analysis_signature'):return []
     w,h=template['rect'][2:]
     if min(w,h)<=0 or max(w,h)>150:return []
     result=[];seen=set()
     for item in items:
-        if item.source!='pdf_native' or item.normalized_text!=expected:continue
+        if item.source not in ('pdf_native','pdf_outline') or item.normalized_text!=expected:continue
         ratio=min(item.bbox[2:])/max(layout.get('glyph_size',min(item.bbox[2:])),.1)
-        if not .8<=ratio<=1.25:continue
+        if not (.35 if template.get('source')=='LEGEND' else .8)<=ratio<=(3. if template.get('source')=='LEGEND' else 1.25):continue
         for angle in (0,90,180,270):
             sw,sh=(h*ratio,w*ratio) if angle%180 else (w*ratio,h*ratio)
             for label_angle in (0,-angle):
@@ -31,7 +32,8 @@ def label_proposals(template, expected, items, meta):
                 if key in seen:continue
                 seen.add(key)
                 result.append(dict(rect=rect,verification_rect=rect,score=0.,scale=ratio,
-                    rotation=-angle,raster_angle=angle,source='label_geometry_probe',recovery_only=(min(w,h)>=5 or min(w,h)/max(w,h)<.35)))
+                    rotation=-angle,raster_angle=angle,source='outline_geometry_probe' if item.source=='pdf_outline' else 'label_geometry_probe',
+                    recovery_only=(item.source!='pdf_outline' and (min(w,h)>=5 or min(w,h)/max(w,h)<.35))))
     return result
 
 

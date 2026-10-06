@@ -31,13 +31,24 @@ def train(directory, progress=lambda p: None, status=lambda s: None, epochs=80, 
         rows=[r for r in rows if r['split']=='train']
         locations={hashlib.sha256(repr((r['document'],r['page'],tuple(round(v,3) for v in r['rect']))).encode()).hexdigest()
                    for r in rows}
-        ordered=sorted(locations)
-        assignments={key:('train' if i<len(ordered)*.7 else 'validation' if i<len(ordered)*.85 else 'test')
-                     for i,key in enumerate(ordered)}
+        # Adding a PDF must not move earlier test locations into training.
+        assignments={key:('train' if int(key[:16],16)%100<70 else
+            'validation' if int(key[:16],16)%100<85 else 'test') for key in locations}
+        for row in rows:
+            frozen=row.get('metadata',{}).get('preliminary_split')
+            if frozen in splits:
+                key=hashlib.sha256(repr((row['document'],row['page'],tuple(round(v,3) for v in row['rect']))).encode()).hexdigest()
+                assignments[key]=frozen
         splits={s:[] for s in ('train','validation','test')}
         for row in rows:
             key=hashlib.sha256(repr((row['document'],row['page'],tuple(round(v,3) for v in row['rect']))).encode()).hexdigest()
             splits[assignments[key]].append(row)
+        with store.connect() as db:
+            from ..json_values import dumps
+            for split,records in splits.items():
+                for row in records:
+                    row['metadata']['preliminary_split']=split
+                    db.execute('UPDATE examples SET metadata=? WHERE id=?',(dumps(row['metadata']),row['id']))
         for records in splits.values():
             if not records or len({r['outcome'] for r in records})<2:
                 raise ValueError('Za mało zróżnicowanych lokalizacji do kontroli nauki wstępnej. Dodaj kolejne ocenione przykłady.')
@@ -81,7 +92,9 @@ def train(directory, progress=lambda p: None, status=lambda s: None, epochs=80, 
         classic.append(float(result['verified']))
     classic_ms = (time.monotonic() - classic_start) * 1000
     combined = np.maximum(np.asarray(classic), (scores >= threshold).astype(np.float32))
-    identity = hashlib.sha256('|'.join(sorted(r['id'] + ':' + r['outcome'] + ':' + r['split']
+    identity = hashlib.sha256('|'.join(sorted(r['id'] + ':' + r['outcome'] + ':' + r['split'] + ':' +
+        r.get('metadata',{}).get('preliminary_split','') + ':' +
+        hashlib.sha256(r['reference']).hexdigest() + ':' + hashlib.sha256(r['crop']).hexdigest()
                                                    for r in rows)).encode()).hexdigest()
     model_id = time.strftime('%Y%m%d-%H%M%S') + '-' + identity[:8]
     by_group = {}
@@ -100,6 +113,7 @@ def train(directory, progress=lambda p: None, status=lambda s: None, epochs=80, 
         measurement='human-labelled visual pairs; not whole-page detection recall',
         auto_activated=False)
     report.update(preliminary=preliminary,
+        source_documents=sorted({(r['document'],r['document_name']) for r in rows}),
         example_ids={s:[r['id'] for r in records] for s,records in splits.items()},
         assessment_origins=sorted({r.get('metadata',{}).get('assessment_origin','user') for r in rows}),
         validation_scope='same_document_locations' if preliminary else 'independent_documents',

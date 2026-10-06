@@ -66,6 +66,11 @@ class LearningStore:
         identifier = hashlib.sha256(json_dumps([doc, record['page'], record['group_id'],
             [round(float(v), 3) for v in record['rect']]], sort_keys=True).encode()).hexdigest()
         with self.connect() as db:
+            metadata=dict(record.get('metadata',{}))
+            previous=db.execute('SELECT metadata FROM examples WHERE id=?',(identifier,)).fetchone()
+            if previous:
+                frozen=json.loads(previous[0]).get('preliminary_split')
+                if frozen in SPLITS:metadata['preliminary_split']=frozen
             # Search can assign fresh detection UUIDs at the same location.
             # A review-queue import must never erase an existing human rating.
             if record['outcome']=='pending' and db.execute('SELECT 1 FROM examples WHERE id=?',(identifier,)).fetchone():
@@ -79,7 +84,7 @@ class LearningStore:
             db.execute('INSERT OR REPLACE INTO examples VALUES(?,?,?,?,?,?,?,?,?,?,?)',
                 (identifier, doc, record['page'], record['group_id'], record['group_name'],
                  json_dumps(record['rect']), record['outcome'], blob_ref, blob_crop,
-                 json_dumps(record.get('metadata', {})), time.time()))
+                 json_dumps(metadata), time.time()))
         return identifier
 
     def examples(self, with_images=True):
@@ -184,15 +189,28 @@ class LearningStore:
         with self.connect() as source, sqlite3.connect(backup) as destination:
             source.backup(destination)
         try:
+            existing={r['id']:r for r in self.examples(False)}
+            imported=0
             for row, ref, crop in prepared:
+                identifier=hashlib.sha256(json_dumps([row['document'],row['page'],row['group_id'],
+                    [round(float(v),3) for v in row['rect']]],sort_keys=True).encode()).hexdigest()
+                current=existing.get(identifier)
+                if current and current['outcome']!='pending':
+                    local_origin=current.get('metadata',{}).get('assessment_origin','user')
+                    incoming_origin=row.get('metadata',{}).get('assessment_origin','user')
+                    # A supplied cumulative base must not undo the user's local
+                    # corrections. Existing deliberate ratings remain authoritative.
+                    if local_origin=='user' and incoming_origin!='user':continue
+                    if current['updated']>row.get('updated',0):continue
                 self.record(row, ref, crop)
+                imported+=1
         except Exception:
             with sqlite3.connect(backup) as source, self.connect() as destination:
                 source.backup(destination)
             raise
         finally:
             backup.unlink(missing_ok=True)
-        return len(prepared)
+        return imported
 
     def save_report(self, report):
         with self.connect() as db:

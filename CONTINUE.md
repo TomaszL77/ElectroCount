@@ -1,3 +1,7 @@
+# 0.7.8.7 — kontury oznaczeń i uczenie kumulacyjne
+
+Podstawa: 0.7.8.6, commit 2eba6819455be38883eae94203986cdfb53d42d4. docs/cumulative-0787.md opisuje zmiany. Prywatna wspólna baza i model dostarczane poza repozytorium. Zachować wcześniejsze przykłady przy każdej aktualizacji, kontrolować stare lokalizacje; wynik par nie jest kompletnością arkusza. Nie aktualizować ponownie reviewed_apparatus_parts z prostokąta zaznaczenia. Oryginał RGB i pełna sygnatura pozostają źródłami. analysis_signature służy wyłącznie porównaniu grafiki po oddzieleniu zewnętrznego odczytanego kodu. Wszystkie kody docelowe odczytywane niezależnie od szukanego typu. Nowe prywatne PDF-y nigdy nie należą do publicznego drzewa Git.
+
 # 0.7.8.6 — wygodniejsza praca
 
 Podstawa 0.7.8.5, commit 0a48383f01648cbdf3371e5ad62a61a0d367676f. Zmieniono wyłącznie interfejs i obsługę poleceń. Silniki wyszukiwania, definicja wzorca, zapis projektu, modele i biblioteki nie zmieniły się. Panel grup ma więcej miejsca i pionowy splitter z wykryciami. Próg podobieństwa i filtry są w jednym oknie ustawień, podsumowanie w osobnym ukrytym panelu szczegółów. Delete naprawdę usuwa wykrycie, czyści jego relacje konfliktów i wspiera historię. Usunięta ręczna korekta nie staje się błędnym przykładem treningowym. Q jest chwilowym narzędziem, przy puszczeniu / utracie aktywności wraca poprzedni tryb; wpisywanie tekstu i dialogi nie uruchamiają skrótu. Shift + rolka przesuwa poziomo bez zmiany zoomu. Szczegóły i ograniczenia kontroli: docs/workspace-0786.md.

@@ -274,7 +274,13 @@ class NativeVectorPage:
         ids=np.flatnonzero((b[:,0]<x+w)&(b[:,1]<y+h)&
             (b[:,0]+b[:,2]>x)&(b[:,1]+b[:,3]>y))
         paths=self.decode(ids,preserve=True)
-        if paths is not None:paths=[p for p in paths if intersects_selection(p,selection)]
+        if paths is not None:
+            # A white page backing paints paper, not a symbol. Preserve white
+            # details inside the selection (holes/overprints) and every stroke.
+            paths=[p for p in paths if intersects_selection(p,selection) and not (
+                p.get('fill') and not p.get('stroke') and
+                len(p.get('color', [])) == 4 and min(p['color'][:3]) >= 250 and
+                contains(p['bbox'], selection, .001) and not contains(selection, p['bbox'], .001))]
         from .text_engine import intersection
         if any(intersection(selection,r)>0 for r in self.image_regions):return None
         relevant_clips=[int(i) for i in ids if int(i) in self.clipped and

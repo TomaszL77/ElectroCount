@@ -12,7 +12,11 @@ class ResultsManager:
         if group.template and group.template.get('representation'):
             group.template['group_id']=group.id
             group.template['representation']['group_id']=group.id
-        if not group.label:
+        from .text_roles import TextRoleClassifier
+        if (group.label and TextRoleClassifier().classify(group.label)[0]!='DEVICE_LABEL' and
+                group.name.strip().upper()==group.label.strip().upper() and result.get('label')):
+            group.name=result['label']
+        if not group.label or TextRoleClassifier().classify(group.label)[0]!='DEVICE_LABEL':
             group.label = result["label"]
         previous = [d for d in project.detections if d.page == page and d.source == "automatic"
                     and (d.group == group_id or (not d.group and d.requested_group == group_id))]
@@ -62,4 +66,3 @@ class ResultsManager:
         project.text_items[str(page)] = [{**item, "page": page} for item in result["text_items"]]
         return {"matches": len(result["matches"]), "review": len(result["review"]),
                 "other": len(result["discovered_other_label"])}
-

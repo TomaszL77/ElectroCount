@@ -118,7 +118,8 @@ class LearningPanel(QDialog):
         self.train_button.setText('Wytrenuj wstępnie' if self.preliminary else 'Wytrenuj model')
         if not ready:
             reason+=' Pominięte poprawne elementy oceniaj jako Poprawny. Błędny = element niepasujący do wzorca, nie pominięcie.'
-        self.ready.setText(reason + (' Do pełnej kontroli zbieraj oceny z kolejnych PDF-ów.' if self.preliminary else ' Każdy PDF należy w całości do jednego podziału. Zalecane: co najmniej 4 różne dokumenty.'))
+        self.ready.setText(reason + (' Do pełnej kontroli zbieraj oceny z kolejnych PDF-ów.' if self.preliminary else ' Każdy PDF należy w całości do jednego podziału. Zalecane: co najmniej 4 różne dokumenty.')+
+            ' Każdy trening korzysta ze wspólnej bazy wcześniejszych i nowych ocen. Samo otwarcie PDF-u nie oznacza jego wyuczenia.')
         self.train_button.setEnabled(ready and not self.service.busy and not self.window.busy and not self.window.loading)
         self.cancel_button.setEnabled(bool(self.service.current and self.service.current['kind']=='train'))
         for button in self.file_buttons: button.setEnabled(not self.service.busy)

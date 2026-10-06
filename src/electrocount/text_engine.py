@@ -123,9 +123,9 @@ def prepare_template(engine, path, page, selection):
         try:
             with engine.open_vector_page(path,page) as native:
                 signature=native.template_signature(selection,items)
+                from .document_regions import legend_regions, region_for
+                legend_region=region_for(selection,legend_regions(native,items))
                 if signature:
-                    from .document_regions import legend_regions, region_for
-                    legend_region=region_for(signature['bbox'],legend_regions(native,items))
                     if legend_region:
                         signature['source_legend']=True
         except (RuntimeError,AttributeError) as exc:
@@ -156,6 +156,24 @@ def prepare_template(engine, path, page, selection):
     # Keep all contextual evidence even when the selection explicitly picks a label.
     association['associated_texts']=TextEngine().associate(rect,items).get('associated_texts',[])
     item = association["item"]
+    analysis_signature=None
+    if signature and item and item.source in ('ocr','pdf_outline'):
+        from .vector_engine import contains,signature as make_signature
+        text_paths=[p for p in signature['paths'] if contains(item.bbox,p['bbox'],.65)]
+        body=[p for p in signature['paths'] if p not in text_paths]
+        # Separate an external inscription only. Interior distinguishing marks
+        # remain part of the graphic. The original signature is never replaced.
+        if text_paths and body:
+            candidate=make_signature(body,preserve_selection=True)
+            if candidate and not intersection(candidate['bbox'],item.bbox):
+                glyph=make_signature(text_paths,preserve_selection=True)
+                if glyph:
+                    gx,gy,gw,gh=glyph['bbox']
+                    item=PdfTextItem(item.text,item.normalized_text,item.page,list(glyph['bbox']),
+                        [gx+gw/2,gy+gh/2],item.source,item.confidence,item.rotation)
+                    association=TextEngine().associate(rect,[item])
+                analysis_signature={**candidate,'native_local':True,'foreground':'all',
+                    'source_legend':bool(legend_region),'context_paths':[],'core_fill':False}
     raster_rect=list(selection)
     from .electrical_profile import build_profile
     caption_bbox=None
@@ -165,8 +183,9 @@ def prepare_template(engine, path, page, selection):
         if rect[0]+rect[2]<=columns[1]+.5:
             row=next(((a,b) for a,b in zip(rows,rows[1:]) if a<=cy<=b),None)
             if row and len(columns)>=3:
-                caption_bbox=[columns[1]+1,row[0]+1,columns[2]-columns[1]-2,row[1]-row[0]-2]
-    return {"legend_caption_bbox":caption_bbox,"source": "LEGEND" if signature and signature.get('source_legend') else "DRAWING",
+                col=0 if legend_region.get('layout')=='symbol_description' else 1
+                caption_bbox=[columns[col]+1,row[0]+1,columns[col+1]-columns[col]-2,row[1]-row[0]-2]
+    return {"analysis_signature":analysis_signature,"legend_caption_bbox":caption_bbox,"source": "LEGEND" if legend_region else "DRAWING",
             "electrical_profile":build_profile(rect,selected),
             "associated_texts":association.get('associated_texts',[]),
             "text_role_confidence":association.get('text_role_confidence',0),
@@ -177,7 +196,7 @@ def prepare_template(engine, path, page, selection):
             "label_item": item.to_dict() if item else None,
             "spatial_association_score": association["score"],
             "reason": association["reason"], "text_aware": True,
-            "definition_version": 12, "geometry_source": "native_local" if signature else "raster",
+            "definition_version": 13, "geometry_source": "native_local" if signature else "raster",
             "text_bbox":item.bbox if item else None,
             "self_check":False, "extraction_mode":"full_selection",
             "preserved_paths":len(signature["paths"]) if signature else None,"removed_paths":0,

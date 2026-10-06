@@ -908,6 +908,10 @@ class MainWindow(ImportWindowMixin, QMainWindow):
                 if replacing:self.invalidate_label(target.id)
                 template['group_id']=target.id
                 template['representation']['group_id']=target.id
+                # An existing empty group was explicitly named by the user.
+                # OCR supplies a separate detection label, never overwrites it.
+                if target.id == group_id:
+                    name = target.name
                 target.name, target.label, target.template = name, detected, template
                 target.possible_label = template.get("possible_label", "")
                 self.project.active = target.id

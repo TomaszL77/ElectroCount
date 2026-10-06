@@ -22,8 +22,9 @@ class DetectionEngine:
     def find(self,path,page,template,label="",threshold=.82,progress=lambda p:None,template_path=None,status=lambda text:None):
         status("Odczyt tekstu i przygotowanie wzorca")
         source=template_path or path
-        if not template.get("text_aware") or (template.get("definition_version",0)<12 and
-                template.get("selection_rect") and hasattr(self.pdf,"open_vector_page")):
+        if not template.get("text_aware") or (template.get("definition_version",0)<13 and
+                template.get("selection_rect") and hasattr(self.pdf,"open_vector_page") and
+                template.get('extraction_mode')!='reviewed_apparatus_parts'):
             previous=template
             from .detection_service import prepare_detection
             template=prepare_detection(self.pdf,source,template['page'],template.get('selection_bbox',template.get('selection_rect',template['rect'])))
@@ -38,7 +39,18 @@ class DetectionEngine:
             template['id']=previous.get('id',previous.get('representation',{}).get('id'))
         shape_color=template.get('match_mode') in ('shape','shape_color')
         strict_color=template.get('match_mode')=='shape_color'
-        expected='' if shape_color else normalize_text(label or template.get("label",""))
+        from .text_roles import TextRoleClassifier
+        supplied=normalize_text(label)
+        if supplied and TextRoleClassifier().classify(supplied)[0]!='DEVICE_LABEL':supplied=''
+        expected='' if shape_color else normalize_text(supplied or template.get("label",""))
+        original_template=template
+        if template.get('analysis_signature') and not shape_color:
+            from .text_engine import as_item
+            body=template['analysis_signature']['bbox']
+            association=self.text.associate(body,[as_item(template['label_item'])])
+            template={**template,'rect':list(body),'signature':template['analysis_signature'],
+                'raster_rect':[body[0]-.5,body[1]-.5,body[2]+1,body[3]+1],
+                'association':association.get('layout')}
         if template.get('signature') and template.get('source')=='LEGEND':
             template['signature']['source_legend']=True
         if not self.custom_matcher and hasattr(self.pdf,'open_vector_page'):
@@ -55,6 +67,10 @@ class DetectionEngine:
                 progress(100)
                 return result
         items=self.pdf.extract_text(path,page)
+        if not items and not self.custom_matcher and hasattr(self.pdf,'open_vector_page'):
+            from .ocr_engine import OCREngine
+            status('Odczyt oznaczeń zapisanych w PDF jako kształty')
+            items=OCREngine().read_outlined_text(self.pdf,path,page)
         template_items=items if source==path and page==template["page"] else self.pdf.extract_text(source,template["page"])
         progress(5)
         status("Odczyt geometrii PDF")
@@ -189,6 +205,32 @@ class DetectionEngine:
                     self.pdf,source,path,page,template,candidate,template_items,items,reference_cache)
                 candidate['verification_scale']=sampling
                 evidence={'verified':False,'geometry_score':0.,'feature_score':0.} if candidate.get('recovery_only') else self.features.verify(transformed,patch)
+                if (candidate.get('source')=='outline_geometry_probe' and template.get('analysis_signature')
+                        and not evidence['verified']):
+                    from .feature_matcher import contour_evidence
+                    import numpy as np
+                    colors={tuple(p.get('color',[])[:3]) for p in signature['paths']}
+                    if len(colors)==1:
+                        color=next(iter(colors))
+                        if len(color)==3 and max(color)-min(color)>=45:
+                            # Grey architecture may cross a coloured inscription.
+                            # Compare observed coloured paint, retaining every
+                            # interior mark and hole, without reconstructing ink.
+                            rgb=patch.astype(np.int16)
+                            keep=(rgb.max(axis=2)-rgb.min(axis=2)>=30)&(rgb.argmax(axis=2)==int(np.argmax(color)))
+                            clean=patch.copy();clean[~keep]=255
+                            paint=contour_evidence(transformed,clean)
+                            if paint['verified']:
+                                evidence={**paint,'verification_method':'outline_label_complete_paint',
+                                    'verification_reason':'complete_coloured_symbol_and_independent_label'}
+                            elif (paint.get('geometry_score',0)>=.70 and
+                                    paint.get('reference_coverage',0)>=.70 and
+                                    paint.get('foreground_ratio',0)>=.60 and
+                                    paint.get('fill_consistent',False)):
+                                # A legible code with substantial observed body
+                                # support is useful to review, never an automatic quantity.
+                                evidence={**paint,'verified':True,'verification_method':'outline_label_paint_review'}
+                                candidate['outline_paint_review']=True
                 if not evidence['verified'] and hasattr(self.features,'verify_with_context') and evidence.get('reference_coverage',0)>=.99 and evidence.get('fill_consistent',True):
                     x,y,w,h=candidate.get('verification_rect',candidate['rect'])
                     meta=self.pdf.inspect(path)[page]
@@ -208,7 +250,7 @@ class DetectionEngine:
                         shape_recovered+=1
                 candidate.update(evidence)
                 candidate["graphic_score"]=(candidate["score"]+evidence["feature_score"])/2
-                if candidate.get('source')=='label_geometry_probe' and evidence['verified']:
+                if candidate.get('source') in ('label_geometry_probe','outline_geometry_probe') and evidence['verified']:
                     candidate['graphic_score']=(evidence['geometry_score']+evidence['feature_score'])/2
             if not candidate['verified'] and not self.custom_matcher and candidate.get('verification_reason')!='visible_fill_variant_mismatch':
                 if reference is None:
@@ -368,7 +410,7 @@ class DetectionEngine:
                 'text_score':(float(exact) if expected else None),
                 'text_role_confidence':association.get('text_role_confidence',0),
                 'spatial_text_score':spatial,'spatial_association_score':spatial}
-            if item and item.source=='ocr':
+            if item and item.source in ('ocr','pdf_outline'):
                 signals['text_score']=signals['device_label_score']=item.confidence if exact else 0.
             signals.update(shape_score=graphic,visual_score=visual,label_score=signals['device_label_score'],text_association_score=spatial)
             state,confidence,decision_reason=FinalDecisionEngine().decide(expected,actual,signals)
@@ -384,12 +426,14 @@ class DetectionEngine:
             hit['verification_details']['expected_electrical_profile']=expected_profile
             if profile_state=='OTHER_VARIANT':
                 hit['label']=display_label(actual,candidate_profile) or actual
-            if item and item.source=='ocr' and item.confidence<.95 and state=='MATCH':
+            if item and item.source in ('ocr','pdf_outline') and item.confidence<.95 and state=='MATCH':
                 state,decision_reason='REVIEW','uncertain_ocr_label'
             if candidate.get('partial_occlusion') and state!='OTHER_VARIANT':
                 state,decision_reason='REVIEW','partial_occlusion_review'
             if candidate.get('visible_paint_review') and state!='OTHER_VARIANT':
                 state,decision_reason='REVIEW','visible_paint_needs_review'
+            if candidate.get('outline_paint_review') and state!='OTHER_VARIANT':
+                state,decision_reason='REVIEW','outlined_code_graphic_needs_review'
             if candidate.get('visible_paint'):
                 hit['verification_details']['visible_paint']=candidate['visible_paint']
             if candidate.get('learned_recovery') and state!='OTHER_VARIANT':
@@ -447,6 +491,7 @@ class DetectionEngine:
         result['counts']={'raw_matches':len(countable)+len(result['legend_matches']),
             'legend_matches':len(result['legend_matches']),'countable_devices':len(countable)}
         result['regions']=regions
+        result['template']=original_template
         if len(countable)<=1:
             warnings.append("Znaleziono co najwyżej jeden element. Sprawdź wycinek wzorca, oznaczenie i zakres stron; wynik nie potwierdza kompletności zliczania.")
         status("Kończenie analizy strony")

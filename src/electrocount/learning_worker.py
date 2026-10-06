@@ -13,6 +13,7 @@ from .pdf_cache import CachedPDFEngine
 from .ai.learning_images import symbol_crop
 
 DIGESTS = {}
+CAPTURE_OCR = None
 
 
 def emit(message):
@@ -20,12 +21,21 @@ def emit(message):
 
 
 def capture(request, pdf):
+    global CAPTURE_OCR
     template = request['template']
     source, reference_page = request['template_path'], request['template_page']
     reference_box = template.get('raster_rect', template.get('symbol_bbox', template['rect']))
+    if template.get('analysis_signature') and template.get('match_mode') not in ('shape','shape_color'):
+        x,y,w,h=template['analysis_signature']['bbox']
+        reference_box=[max(0,x-.5),max(0,y-.5),w+1,h+1]
     candidate_box = request['rect']
     reference = symbol_crop(pdf,source,reference_page,reference_box)
-    crop = symbol_crop(pdf,request['path'],request['page'],candidate_box)
+    candidate_items=None
+    if template.get('analysis_signature') and not pdf.extract_text(request['path'],request['page']):
+        from .ocr_engine import OCREngine
+        if CAPTURE_OCR is None:CAPTURE_OCR=OCREngine()
+        candidate_items=CAPTURE_OCR.read_region(pdf,request['path'],request['page'],candidate_box)
+    crop = symbol_crop(pdf,request['path'],request['page'],candidate_box,candidate_items)
     stat = Path(request['path']).stat()
     key = (request['path'], stat.st_size, stat.st_mtime_ns)
     if key not in DIGESTS:

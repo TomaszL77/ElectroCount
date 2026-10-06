@@ -5,6 +5,8 @@ import re
 class TextRoleClassifier:
     def classify(self, text):
         text = ' '.join(text.upper().split())
+        if text.rstrip(':') in ('LEGENDA', 'LEGEND', 'UWAGI', 'NOTES', 'OPIS', 'SYMBOL'):
+            return 'DESCRIPTION', .99
         from .electrical_profile import modifier
         if modifier(text):return 'DEVICE_MODIFIER', .95
         if re.fullmatch(r'(?:W|O):[^\s]+', text):

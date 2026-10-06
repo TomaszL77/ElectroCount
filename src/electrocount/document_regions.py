@@ -54,6 +54,38 @@ def table_regions(native):
         x,y,w,h=p['bbox']
         if h<.05:groups[(round(x),round(x+w))].append(y)
     regions=[]
+    # Some CAD exports draw each table cell as a complete closed rectangle,
+    # rather than separate long horizontal/vertical rules. Require a repeated
+    # narrow symbol column beside a wider description column, with common rows.
+    cells=defaultdict(list)
+    closed=np.flatnonzero((b[:,2]>20)&(b[:,2]<600)&(b[:,3]>5)&(b[:,3]<80)&(native.index[:,5]<=6))
+    for p in native.decode(closed) or []:
+        x,y,w,h=p['bbox'];edges=p['segments']
+        if p.get('fill') or len(edges)!=4:continue
+        if any(e['kind']!='line' or min(abs(e['points'][0][0]-e['points'][-1][0]),
+                abs(e['points'][0][1]-e['points'][-1][1]))>.01 for e in edges):continue
+        if any(abs(e['points'][-1][0]-edges[(i+1)%4]['points'][0][0])>.01 or
+               abs(e['points'][-1][1]-edges[(i+1)%4]['points'][0][1])>.01 for i,e in enumerate(edges)):continue
+        cells[(round(x,2),round(x+w,2))].append((round(y,2),round(y+h,2)))
+    for (left,middle),rows in cells.items():
+        if middle-left>120:continue
+        for (start,right),other_rows in cells.items():
+            if abs(start-middle)>.1 or right-start<max(100,(middle-left)*2):continue
+            common=sorted(set(rows)&set(other_rows))
+            if len(common)<8:continue
+            runs=[];current=[]
+            for row in common:
+                if current and row[0]>current[-1][1]+.1:
+                    runs.append(current);current=[]
+                current.append(row)
+            runs.append(current)
+            for run in runs:
+                if len(run)<8:continue
+                top,bottom=run[0][0],run[-1][1]
+                if (right-left)*(bottom-top)>native.size[0]*native.size[1]*.15:continue
+                regions.append({'rect':[left,top,right-left,bottom-top],'kind':'legend',
+                    'evidence':'repeated_closed_cells','layout':'symbol_description',
+                    'columns':[left,middle,right],'rows':[top]+[r[1] for r in run]})
     for (left,right),ys in groups.items():
         ys=sorted(set(round(y,2) for y in ys))
         if len(ys)<8:continue
