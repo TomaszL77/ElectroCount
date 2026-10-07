@@ -4,6 +4,7 @@ from .vector_engine import contains
 
 def legend_regions(native, items):
     regions=list(table_regions(native))
+    regions.extend(heading_table_regions(native, items))
     for item in items:
         if item.normalized_text not in ("LEGENDA", "LEGEND"):continue
         options=[]
@@ -31,6 +32,69 @@ def legend_regions(native, items):
             rect=min(options,key=lambda b:b[2]*b[3])
             if not any(r['rect']==rect for r in regions):regions.append({'rect':rect,'kind':'legend','evidence':'heading_in_table_frame','heading':item.to_dict()})
     return regions
+
+
+def heading_table_regions(native, items):
+    """A short legend may have a merged heading and a border drawn as an L.
+
+    Read complete ruled segments, not just one-segment PDF objects. Require
+    native legend and column headings plus an independently closed table;
+    sparse architectural grids must not broaden the symbol search scale.
+    """
+    import numpy as np
+    from collections import defaultdict
+    headings=[i for i in items if i.normalized_text in ('LEGENDA','LEGEND')]
+    if not headings:return []
+    b=native.bounds
+    ids=np.flatnonzero((b[:,2]<800)&(b[:,3]<600)&
+        ((b[:,2]>100)|(b[:,3]>30))&(native.index[:,5]<=8))
+    horizontal=defaultdict(list);vertical=[]
+    for p in native.decode(ids) or []:
+        for edge in p['segments']:
+            if edge['kind']!='line':continue
+            (x,y),(a,z)=edge['points']
+            if abs(y-z)<.05 and abs(x-a)>100:
+                horizontal[(round(min(x,a),2),round(max(x,a),2))].append(round((y+z)/2,2))
+            elif abs(x-a)<.05 and abs(y-z)>5:
+                vertical.append((round((x+a)/2,2),min(y,z),max(y,z)))
+    tables=[]
+    for bounds,lines in horizontal.items():
+        run=[]
+        for y in sorted(set(lines)):
+            if run and y-run[-1]>80:
+                tables.append((bounds,run));run=[]
+            run.append(y)
+        tables.append((bounds,run))
+    result=[]
+    for (left,right),ys in tables:
+        if len(ys)<5:continue
+        top,bottom=ys[0],ys[-1];rect=[left,top,right-left,bottom-top]
+        heading=next((i for i in headings if contains(rect,i.bbox,0) and i.center[1]<ys[1]),None)
+        if heading is None:continue
+        start=ys[1];columns=defaultdict(list)
+        for x,a,z in vertical:
+            if left-.1<=x<=right+.1:columns[x].append((a,z))
+        spans=[]
+        for x,intervals in columns.items():
+            end=start
+            for a,z in sorted(intervals):
+                if a<=end+.1:end=max(end,z)
+            if end>=bottom-.1:spans.append(x)
+        spans.sort()
+        if len(spans)<3 or abs(spans[0]-left)>.1 or abs(spans[-1]-right)>.1:continue
+        if not 15<spans[1]-left<min(140,(right-left)*.4):continue
+        headers=[i for i in items if start<=i.center[1]<=ys[2]]
+        symbol=any(i.normalized_text in ('SYMBOL','SYMBOLS') and left<i.center[0]<spans[1] for i in headers)
+        description=any(i.normalized_text in ('OPIS','DESCRIPTION') and spans[1]<i.center[0]<spans[2] for i in headers)
+        # Both outside edges must also enclose the merged legend heading.
+        closed=all(any(abs(x-border)<.1 and a<=top+.1 and z>=bottom-.1
+                       for x,a,z in vertical) for border in (left,right))
+        gaps=np.diff(ys[1:]);median=float(np.median(gaps))
+        regular=5<median<80 and np.mean(abs(gaps-median)<max(.5,median*.08))>=.8
+        if symbol and description and closed and regular:
+            result.append({'rect':rect,'kind':'legend','evidence':'native_heading_ruled_table',
+                'layout':'symbol_description','columns':spans,'rows':ys,'heading':heading.to_dict()})
+    return result
 
 
 def region_for(rect, regions):

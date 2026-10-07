@@ -196,7 +196,7 @@ def prepare_template(engine, path, page, selection):
             "label_item": item.to_dict() if item else None,
             "spatial_association_score": association["score"],
             "reason": association["reason"], "text_aware": True,
-            "definition_version": 13, "geometry_source": "native_local" if signature else "raster",
+            "definition_version": 14, "geometry_source": "native_local" if signature else "raster",
             "text_bbox":item.bbox if item else None,
             "self_check":False, "extraction_mode":"full_selection",
             "preserved_paths":len(signature["paths"]) if signature else None,"removed_paths":0,

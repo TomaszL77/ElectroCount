@@ -22,7 +22,7 @@ class DetectionEngine:
     def find(self,path,page,template,label="",threshold=.82,progress=lambda p:None,template_path=None,status=lambda text:None):
         status("Odczyt tekstu i przygotowanie wzorca")
         source=template_path or path
-        if not template.get("text_aware") or (template.get("definition_version",0)<13 and
+        if not template.get("text_aware") or (template.get("definition_version",0)<14 and
                 template.get("selection_rect") and hasattr(self.pdf,"open_vector_page") and
                 template.get('extraction_mode')!='reviewed_apparatus_parts'):
             previous=template
@@ -257,7 +257,7 @@ class DetectionEngine:
                     reference=mask_text(self.pdf.render(source,template['page'],2.,template.get('raster_rect',template['rect'])),template_items,template.get('raster_rect',template['rect']),2.)
                 partial=verify_partial(self.pdf,path,page,template,reference,candidate,items)
                 if partial:candidate.update(partial)
-            if self.learned_model and candidate.get('verification_reason')!='visible_fill_variant_mismatch' and (not candidate['verified'] or candidate.get('source') in ('raster','coarse_page')):
+            if self.learned_model and candidate.get('verification_reason')!='visible_fill_variant_mismatch' and (shape_color or not candidate['verified'] or candidate.get('source') in ('raster','coarse_page')):
                 # Small model can recover proposals rejected by image geometry,
                 # but these are always review items, never automatic quantities.
                 from .ai.learning_images import symbol_crop
@@ -397,7 +397,11 @@ class DetectionEngine:
             if strict_color and not color_matches(reference_color,candidate_color):
                 result['rejected_candidates'].append({'rect':candidate['rect'],'status':'REJECTED','reason':'different_foreground_color'})
                 continue
-            visual=None
+            # With no inscription, the learned pair classifier also assesses
+            # native matches: a plain CAD circle/rectangle can be architectural
+            # background. Low evidence sends it to review; it never bypasses
+            # geometry, paint, or the independent device-code gate.
+            visual=candidate.get('learned_score') if shape_color else None
             if self.encoder:
                 from .ai.visual_encoder import cosine
                 import numpy as np

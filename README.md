@@ -1,3 +1,7 @@
+## 0.7.8.8 — wyszukiwanie opraw bez oznaczeń
+
+Poprawiono rozpoznawanie krótkich legend i dopasowanie skali ich symboli. Własny model ocenia także natywne trafienia bez napisu, aby kierować podobne tło do sprawdzenia. [Obsługa](docs/unlabelled-0788.md).
+
 ## 0.7.8.7 — odczyt oznaczeń CAD i wspólna baza nauki
 
 Poprawiono odczyt kodów narysowanych jako kontury, tabelę legendy z zamkniętych komórek i wpływ białego tła strony. Analiza grafiki i oznaczenia działa osobno, zachowując cały oryginalny wzorzec. Ręcznie wpisane nazwy grup i wcześniej sprawdzone części wzorca są zachowane. Każdy trening obejmuje wcześniejsze i nowe oceny; import nie zastępuje lokalnych poprawek użytkownika danymi przygotowanymi automatycznie. [Opis i obsługa](docs/cumulative-0787.md).
@@ -8,7 +12,7 @@ Poprawiono odczyt kodów narysowanych jako kontury, tabelę legendy z zamknięty
 
 Sam symbol zaznaczony w rozpoznanej tabeli używa kształtu; podpis typu służy jako nazwa grupy. Kod objęty zaznaczeniem nadal podlega pełnej analizie. Ustawienia → Eksportuj diagnozę wyszukiwania pozwala porównać faktyczny model, biblioteki i zaznaczenie. Szczegóły: [docs/legend-0785.md](docs/legend-0785.md).
 
-# ElectroCount 0.7.8.7 — własny mały model AI
+# ElectroCount 0.7.8.8 — własny mały model AI
 
 0.7.8.5: poprawiono błąd zapisu liczb NumPy (`int64`) i obsługę przyciętej ramki arkusza. Dodano jawny tryb **sam kształt** dla wzorców bez kodu, także w szarych kopiach. Szczegóły: [docs/json-0784.md](docs/json-0784.md).
 0.7.8.5: poprawiono odczyt wypełnionych ramek CAD i dodano opcję **Ustawienia → Wzorzec bez oznaczenia: kształt i kolor** dla opraw bez kodów. Szczegóły: [docs/lighting-0783.md](docs/lighting-0783.md).
@@ -18,7 +22,7 @@ Poprawiono odczyt klipów CAD, rozróżnianie pełnych kształtów i oznaczeń g
 
 ## Uruchomienie
 
-Rozpakuj wersję do nowego folderu i uruchom **Uruchom.cmd z tego folderu**. W oknie musi być **0.7.8.7**. Jeśli działa runtime 0.7, nie musisz ponownie pobierać bibliotek ani dużego modelu. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Instalator domyślnie nie pobiera DINO Base; Instaluj_AI.cmd pozostaje opcją dla pełnego, dotychczasowego trybu.
+Rozpakuj wersję do nowego folderu i uruchom **Uruchom.cmd z tego folderu**. W oknie musi być **0.7.8.8**. Jeśli działa runtime 0.7, nie musisz ponownie pobierać bibliotek ani dużego modelu. Przy pierwszej instalacji albo brakujących bibliotekach uruchom Instaluj.cmd. Instalator domyślnie nie pobiera DINO Base; Instaluj_AI.cmd pozostaje opcją dla pełnego, dotychczasowego trybu.
 
 ## Nauka podczas pracy
 
